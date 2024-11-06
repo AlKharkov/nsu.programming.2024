@@ -1,10 +1,11 @@
 """
-version: 1.6
+version: 1.7
 Gauss method
 Determinant(with upper triangular form)
 Inverse matrix(with extended matrix form)
 Run-throw method
 Reflection method(Householder's)
+Richardson with Chebishov`s params
 """
 
 
@@ -149,9 +150,13 @@ def run_throw_method(m: list[list[float]], b: list[float]) -> list[float]:  # A 
         return sum([a[i] * b[i] for i in range(len(a))])'''
 
 
+def norm_vector(v: list[float]) -> float:  # The norm 2
+    return sum(map(lambda q: q * q, v)) ** 0.5
+
+
 def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
-    def norm_vector(v: list[float]) -> float:  # The norm 2
-        return sum(map(lambda q: q * q, v)) ** 0.5
+    def matrices_mul(q: list[list[float]], p: list[list[float]]):
+        return [[sum([q[i][k] * p[k][j] for k in range(len(p))]) for j in range(len(p[0]))] for i in range(len(q))]
 
     def vvt_multiplication(q: list[float], p: list[float]) -> list[list[float]]:
         if len(q) != len(p):
@@ -161,11 +166,8 @@ def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
     def sign(q: float) -> int:
         return 1 if q > 0 else 0 if q == 0 else -1
 
-    def matrix_div(q: list[list[float]], p: list[list[float]]) -> list[list[float]]:
+    def matrices_div(q: list[list[float]], p: list[list[float]]) -> list[list[float]]:
         return [[q[i][j] - p[i][j] for j in range(len(q))] for i in range(len(q))]
-
-    def matrix_mul(q: list[list[float]], p: list[list[float]]):
-        return [[sum([q[i][kk] * p[kk][j] for kk in range(len(p))]) for j in range(len(p[0]))] for i in range(len(q))]
 
     check_correct_ax_b(m, b)
     n = len(m)
@@ -179,10 +181,10 @@ def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
             norm_t = norm_vector(t)
             w = [t[i] / norm_t for i in range(n - k)]
             W = vvt_multiplication([2 * w[j] for j in range(len(w))], w)
-            Ank = matrix_div(Enk, W)
+            Ank = matrices_div(Enk, W)
             Hk = [[1 if i == j and i < k else Ank[i - k][j - k] if i >= k and j >= k else 0 for j in range(n)]
                   for i in range(n)]
-            m = matrix_mul(Hk, m)
+            m = matrices_mul(Hk, m)
     # Calculating x
     x = [0.0 for _ in range(n)]
     for i in range(n - 1, -1, -1):
@@ -190,18 +192,77 @@ def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
     return x
 
 
-def main():
+def richardson_with_chebishovs_params_method(
+        A: list[list[float]], b: list[float], l_min: float, l_max: float, eps=10 ** -5) -> (int, list[float]):
+    '''def num_matrix_mul(p: float, m: list[list[float]]) -> list[list[float]]:
+        return [[p * m[i][j] for j in range(len(m[0]))] for i in range(len(m))]'''
+
+    def num_vector_mul(p: float, v: list[float]) -> list[float]:
+        return [p * v[k] for k in range(len(v))]
+
+    def vectors_sub(v: list[float], u: list[float]) -> list[float]:
+        return [v[k] - u[k] for k in range(len(v))]
+
+    def matrix_vector_mul(m: list[list[float]], v: list[float]) -> list[float]:
+        return [sum([m[k][p] * v[p] for p in range(len(v))]) for k in range(len(v))]
+
+    def mistake(m: list[list[float]], v: list[float], current_x: list[float]) -> list[float]:
+        return vectors_sub(matrix_vector_mul(m, current_x), v)
+
+    def vectors_add(v: list[float], u: list[float]) -> list[float]:
+        return [v[k] + u[k] for k in range(len(v))]
+
+    n = len(b)
+    x0 = [0 for _ in range(n)]
+    xk = x0
+    t_opt = 2 / (l_min + l_max)
+    xkp1 = vectors_sub(x0, num_vector_mul(t_opt, vectors_sub(matrix_vector_mul(A, x0), b)))
+    tk = 1
+    t1 = (l_min + l_max) / (l_min - l_max)
+    tkp1 = t1
+    number_iteration = 1
+    '''print(f'x{number_iteration} = {xkp1}, norm = {norm_vector(xkp1)}')  # Debug x3
+    temp = vectors_sub(matrix_vector_mul(A, xkp1), b)
+    print(f'mistake = {temp}, norm = {norm_vector(temp)}')'''
+    while norm_vector(mistake(A, b, xkp1)) > eps:
+        number_iteration += 1
+        tkm1 = tk
+        tk = tkp1
+        tkp1 = 2 * t1 * tk - tkm1
+        xkm1 = xk
+        xk = xkp1
+        xkp1 = vectors_sub(vectors_add(xk, num_vector_mul(tkm1 / tkp1, vectors_sub(xk, xkm1))),
+                           num_vector_mul(t_opt * (1 + tkm1 / tkp1), vectors_sub(matrix_vector_mul(A, xk), b)))
+        '''print(f'x{number_iteration} = {xkp1}, norm = {norm_vector(xkp1)}')  # Debug x3
+        temp = vectors_sub(matrix_vector_mul(A, xkp1), b)
+        print(f'mistake = {temp}, norm = {norm_vector(temp)}')'''
+    return number_iteration, xkp1
+
+
+def print_iterative(pair: (int, list[float])) -> None:
+    print('The number of last iteration:', pair[0], end=' | ')
+    print_vector(pair[1])
+
+
+def main() -> None:
     try:
         with open('input.txt', 'r') as f:
             n = int(f.readline())  # Input size of matrix nxn
             A = [list(map(float, f.readline().split())) for _ in range(n)]  # Input matrix
             b = list(map(float, f.readline().split()))  # Input vector b
+            l_min, l_max = map(float, f.readline().split())
+            eps = f.readline()
+            if eps == '\n':
+                eps = 10 ** -5
+            else:
+                eps = 10 ** int(eps)
 
             # print_vector(the_gauss_method(A, b))
             # print_matrix(inverse_matrix(A))
             # print(det(A))
             # print_vector(run_throw_method(A, b))
-            print_vector(reflection_method(A, b))
+            # print_vector(reflection_method(A, b))
+            print_iterative(richardson_with_chebishovs_params_method(A, b, l_min, l_max, eps))
     except Exception as e:
         print(str(e.__class__)[8:-2] + ': ' + str(e))
 
