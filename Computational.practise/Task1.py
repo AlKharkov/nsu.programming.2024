@@ -1,11 +1,11 @@
 """
-version: 1.7
+version: 1.8
 Gauss method
 Determinant(with upper triangular form)
 Inverse matrix(with extended matrix form)
 Run-throw method
 Reflection method(Householder's)
-Richardson with Chebishov`s params
+Richardson method with Chebishov`s params
 """
 
 
@@ -141,15 +141,6 @@ def run_throw_method(m: list[list[float]], b: list[float]) -> list[float]:  # A 
     return x
 
 
-'''def transpose(m: list[list[float]]) -> list[list[float]]:
-    return [[m[j][i] for j in range(len(m))] for i in range(len(m))]'''
-
-'''def scalar_multiplication(a: list[float], b: list[float]) -> float:
-        if len(a) != len(b):
-            raise ValueError('Incorrect size of vector by scalar multiplication')
-        return sum([a[i] * b[i] for i in range(len(a))])'''
-
-
 def norm_vector(v: list[float]) -> float:  # The norm 2
     return sum(map(lambda q: q * q, v)) ** 0.5
 
@@ -194,9 +185,6 @@ def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
 
 def richardson_with_chebishovs_params_method(
         A: list[list[float]], b: list[float], l_min: float, l_max: float, eps=10 ** -5) -> (int, list[float]):
-    '''def num_matrix_mul(p: float, m: list[list[float]]) -> list[list[float]]:
-        return [[p * m[i][j] for j in range(len(m[0]))] for i in range(len(m))]'''
-
     def num_vector_mul(p: float, v: list[float]) -> list[float]:
         return [p * v[k] for k in range(len(v))]
 
