@@ -1,11 +1,12 @@
 """
-version: 1.8
+version: 1.9
 Gauss method
 Determinant(with upper triangular form)
 Inverse matrix(with extended matrix form)
 Run-throw method
 Reflection method(Householder's)
-Richardson method with Chebishov`s params
+Richardson method with Chebyshev`s params
+Conjugate gradient method
 """
 
 
@@ -147,7 +148,7 @@ def norm_vector(v: list[float]) -> float:  # The norm 2
 
 def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
     def matrices_mul(q: list[list[float]], p: list[list[float]]):
-        return [[sum([q[i][k] * p[k][j] for k in range(len(p))]) for j in range(len(p[0]))] for i in range(len(q))]
+        return [[sum([q[i][z] * p[z][j] for z in range(len(p))]) for j in range(len(p[0]))] for i in range(len(q))]
 
     def vvt_multiplication(q: list[float], p: list[float]) -> list[list[float]]:
         if len(q) != len(p):
@@ -183,22 +184,26 @@ def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
     return x
 
 
-def richardson_with_chebishovs_params_method(
+def matrix_vector_mul(m: list[list[float]], v: list[float]) -> list[float]:
+    return [sum([m[k][p] * v[p] for p in range(len(v))]) for k in range(len(v))]
+
+
+def vectors_sub(v: list[float], u: list[float]) -> list[float]:
+    return [v[k] - u[k] for k in range(len(v))]
+
+
+def num_vector_mul(p: float, v: list[float]) -> list[float]:
+    return [p * v[k] for k in range(len(v))]
+
+
+def vectors_add(v: list[float], u: list[float]) -> list[float]:
+    return [v[k] + u[k] for k in range(len(v))]
+
+
+def richardson_with_chebyshev_params_method(
         A: list[list[float]], b: list[float], l_min: float, l_max: float, eps=10 ** -5) -> (int, list[float]):
-    def num_vector_mul(p: float, v: list[float]) -> list[float]:
-        return [p * v[k] for k in range(len(v))]
-
-    def vectors_sub(v: list[float], u: list[float]) -> list[float]:
-        return [v[k] - u[k] for k in range(len(v))]
-
-    def matrix_vector_mul(m: list[list[float]], v: list[float]) -> list[float]:
-        return [sum([m[k][p] * v[p] for p in range(len(v))]) for k in range(len(v))]
-
     def mistake(m: list[list[float]], v: list[float], current_x: list[float]) -> list[float]:
         return vectors_sub(matrix_vector_mul(m, current_x), v)
-
-    def vectors_add(v: list[float], u: list[float]) -> list[float]:
-        return [v[k] + u[k] for k in range(len(v))]
 
     n = len(b)
     x0 = [0 for _ in range(n)]
@@ -209,9 +214,6 @@ def richardson_with_chebishovs_params_method(
     t1 = (l_min + l_max) / (l_min - l_max)
     tkp1 = t1
     number_iteration = 1
-    '''print(f'x{number_iteration} = {xkp1}, norm = {norm_vector(xkp1)}')  # Debug x3
-    temp = vectors_sub(matrix_vector_mul(A, xkp1), b)
-    print(f'mistake = {temp}, norm = {norm_vector(temp)}')'''
     while norm_vector(mistake(A, b, xkp1)) > eps:
         number_iteration += 1
         tkm1 = tk
@@ -221,9 +223,6 @@ def richardson_with_chebishovs_params_method(
         xk = xkp1
         xkp1 = vectors_sub(vectors_add(xk, num_vector_mul(tkm1 / tkp1, vectors_sub(xk, xkm1))),
                            num_vector_mul(t_opt * (1 + tkm1 / tkp1), vectors_sub(matrix_vector_mul(A, xk), b)))
-        '''print(f'x{number_iteration} = {xkp1}, norm = {norm_vector(xkp1)}')  # Debug x3
-        temp = vectors_sub(matrix_vector_mul(A, xkp1), b)
-        print(f'mistake = {temp}, norm = {norm_vector(temp)}')'''
     return number_iteration, xkp1
 
 
@@ -232,25 +231,73 @@ def print_iterative(pair: (int, list[float])) -> None:
     print_vector(pair[1])
 
 
+def vtv_mul(u: list[float], v: list[float]) -> float:
+    return sum([u[i] * v[i] for i in range(len(u))])
+
+
+def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None) -> (int, list[float]):
+    n = len(A)
+    if x_prev is None:
+        x_prev = [0 for _ in range(n)]
+    r = vectors_sub(matrix_vector_mul(A, x_prev), b)
+    g = r
+    alpha = vtv_mul(r, g) / vtv_mul(matrix_vector_mul(A, g), g)
+    x = vectors_sub(x_prev, num_vector_mul(alpha, g))
+    r = vectors_sub(matrix_vector_mul(A, x), b)
+    for i in range(n):
+        gamma = vtv_mul(matrix_vector_mul(A, r), g) / vtv_mul((matrix_vector_mul(A, g)), g)  # (A * r, g) / (A * g, g)
+        g = vectors_sub(r, num_vector_mul(gamma, g))  # g = r - gamma * g
+        alpha = vtv_mul(r, g) / (vtv_mul(matrix_vector_mul(A, g), g))
+        x = vectors_sub(x, num_vector_mul(alpha, g))
+        r = vectors_sub(matrix_vector_mul(A, x), b)
+    return x
+
+
+''' # Three-layer formulas
+def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None) -> (int, list[float]):
+    n = len(A)
+    if x_prev is None:
+        x_prev = [0 for _ in range(n)]
+    r = vectors_sub(matrix_vector_mul(A, x_prev), b)  # r0 = A * x0 - b
+    alpha = vtv_mul(r, r) / vtv_mul(matrix_vector_mul(A, r), r)
+    x = vectors_sub(x_prev, num_vector_mul(alpha, r))
+    r_prev = r
+    r = vectors_sub(matrix_vector_mul(A, x), b)
+    for i in range(n):
+        v = the_gauss_method(
+            [[vtv_mul(vectors_sub(r, r_prev), vectors_sub(x, x_prev)), vtv_mul(vectors_sub(r, r_prev), r)],
+             [vtv_mul(vectors_sub(r, r_prev), r), vtv_mul(matrix_vector_mul(A, r), r)]],
+            [vtv_mul(r, vectors_sub(x, x_prev)), vtv_mul(r, r)])
+        x_new = vectors_sub(vectors_sub(x, num_vector_mul(v[0], vectors_sub(x, x_prev))), num_vector_mul(v[1], r))
+        x_prev = x
+        x = x_new
+        r_prev = r
+        r = vectors_sub(matrix_vector_mul(A, x), b)
+    return x'''
+
+
 def main() -> None:
     try:
         with open('input.txt', 'r') as f:
             n = int(f.readline())  # Input size of matrix nxn
             A = [list(map(float, f.readline().split())) for _ in range(n)]  # Input matrix
             b = list(map(float, f.readline().split()))  # Input vector b
-            l_min, l_max = map(float, f.readline().split())
+            '''# l_min, l_max = map(float, f.readline().split()) # for richardson`s method
             eps = f.readline()
             if eps == '\n':
                 eps = 10 ** -5
             else:
-                eps = 10 ** int(eps)
+                eps = 10 ** int(eps)'''
 
-            # print_vector(the_gauss_method(A, b))
+            print('Gauss`s method result: ', end='')
+            print_vector(the_gauss_method(A, b))
             # print_matrix(inverse_matrix(A))
             # print(det(A))
             # print_vector(run_throw_method(A, b))
             # print_vector(reflection_method(A, b))
-            print_iterative(richardson_with_chebishovs_params_method(A, b, l_min, l_max, eps))
+            # print_iterative(richardson_with_chebyshev_params_method(A, b, l_min, l_max, eps))
+            print('Conjugate gradient:    ', end='')
+            print_vector(conjugate_gradient_method(A, b))
     except Exception as e:
         print(str(e.__class__)[8:-2] + ': ' + str(e))
 
