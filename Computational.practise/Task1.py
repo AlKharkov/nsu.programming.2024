@@ -1,5 +1,5 @@
 """
-version: 1.10
+version: 1.11
 Gauss method
 Determinant(with upper triangular form)
 Inverse matrix(with extended matrix form)
@@ -8,6 +8,7 @@ Reflection method(Householder's)
 Richardson method with Chebyshev`s params
 Conjugate gradient method
 Power method
+QR-algorithm
 """
 
 
@@ -147,21 +148,25 @@ def norm_vector(v: list[float]) -> float:  # The norm 2
     return sum(map(lambda q: q * q, v)) ** 0.5
 
 
+def matrices_sub(q: list[list[float]], p: list[list[float]]) -> list[list[float]]:
+    return [[q[i][j] - p[i][j] for j in range(len(q))] for i in range(len(q))]
+
+
+def matrices_mul(q: list[list[float]], p: list[list[float]]):
+    return [[sum([q[i][z] * p[z][j] for z in range(len(p))]) for j in range(len(p[0]))] for i in range(len(q))]
+
+
+def vvt_multiplication(q: list[float], p: list[float]) -> list[list[float]]:
+    if len(q) != len(p):
+        raise ValueError('Incorrect size of vector by v*vT multiplication')
+    return [[q[i] * p[j] for j in range(len(p))] for i in range(len(q))]
+
+
+def sign(q: float) -> int:
+    return 1 if q > 0 else 0 if q == 0 else -1
+
+
 def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
-    def matrices_mul(q: list[list[float]], p: list[list[float]]):
-        return [[sum([q[i][z] * p[z][j] for z in range(len(p))]) for j in range(len(p[0]))] for i in range(len(q))]
-
-    def vvt_multiplication(q: list[float], p: list[float]) -> list[list[float]]:
-        if len(q) != len(p):
-            raise ValueError('Incorrect size of vector by v*vT multiplication')
-        return [[q[i] * p[j] for j in range(len(p))] for i in range(len(q))]
-
-    def sign(q: float) -> int:
-        return 1 if q > 0 else 0 if q == 0 else -1
-
-    def matrices_div(q: list[list[float]], p: list[list[float]]) -> list[list[float]]:
-        return [[q[i][j] - p[i][j] for j in range(len(q))] for i in range(len(q))]
-
     check_correct_ax_b(m, b)
     n = len(m)
     m = [[m[i][j] if j < n else b[i] for j in range(n + 1)] for i in range(n)]  # m = [A|b]
@@ -174,7 +179,7 @@ def reflection_method(m: list[list[float]], b: list[float]) -> list[float]:
             norm_t = norm_vector(t)
             w = [t[i] / norm_t for i in range(n - k)]
             W = vvt_multiplication([2 * w[j] for j in range(len(w))], w)
-            Ank = matrices_div(Enk, W)
+            Ank = matrices_sub(Enk, W)
             Hk = [[1 if i == j and i < k else Ank[i - k][j - k] if i >= k and j >= k else 0 for j in range(n)]
                   for i in range(n)]
             m = matrices_mul(Hk, m)
@@ -256,8 +261,7 @@ def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None,
     return num_iteration, x
 
 
-''' # Three-layer formulas
-def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None) -> (int, list[float]):
+def conjugate_gradient_method_3_layer_forms(A: list[list[float]], b: list[float], x_prev=None) -> (int, list[float]):
     n = len(A)
     if x_prev is None:
         x_prev = [0 for _ in range(n)]
@@ -276,7 +280,7 @@ def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None)
         x = x_new
         r_prev = r
         r = vectors_sub(matrix_vector_mul(A, x), b)
-    return x'''
+    return x
 
 
 def power_method(A: list[list[float]], eps=10 ** -5) -> (int, float):
@@ -297,11 +301,6 @@ def norm_1_matrix(A: list[list[float]]) -> float:
     return max([sum([A[i][j] for i in range(n)]) for j in range(n)])
 
 
-def matrices_sub(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
-    n = len(A)
-    return [[A[i][j] - B[i][j] for j in range(n)] for i in range(n)]
-
-
 def create_identity(n: int) -> list[list[float]]:
     return [[1 if i == j else 0 for j in range(n)] for i in range(n)]
 
@@ -318,6 +317,66 @@ def print_power_method(A: list[list[float]], eps: float) -> None:
     nA = norm_1_matrix(A)
     v = power_method(matrices_sub(num_matrices_mul(nA, create_identity(n)), A), eps)
     print('The number of last iteration:', v[0], '| lambda_min =', simplify_number(nA - v[1]))
+
+
+def QR_decomposition(A: list[list[float]]) -> (list[list[float]], list[list[float]]):
+    n = len(A)
+    R = [[A[i][j] for j in range(n)] for i in range(n)]
+    Q = create_identity(n)
+    for k in range(n - 1):
+        Enk = [[1 if i == j else 0 for j in range(n - k)] for i in range(n - k)]
+        rk = norm_vector([R[i][k] for i in range(k, n)])
+        if rk != 0:
+            t = [R[i][k] for i in range(k, n)]
+            t[0] -= rk * sign(R[k][k])
+            norm_t = norm_vector(t)
+            w = [t[i] / norm_t for i in range(n - k)]
+            W = vvt_multiplication([2 * w[j] for j in range(len(w))], w)
+            Ank = matrices_sub(Enk, W)
+            Hk = [[1 if i == j and i < k else Ank[i - k][j - k] if i >= k and j >= k else 0 for j in range(n)]
+                  for i in range(n)]
+            Q = matrices_mul(Q, inverse_matrix(Hk))
+            R = matrices_mul(Hk, R)
+    return Q, R
+
+
+def max_non_diagonal(A: list[list[float]]) -> float:
+    n = len(A)
+    result = 0
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                result = max(result, abs(A[i][j]))
+    return result
+
+
+def QR_algorithm(A: list[list[float]], eps: float) -> None:
+    n = len(A)
+    m = [[line[j] for j in range(n)] for line in A]
+    W = create_identity(n)
+    num_iteration = 0
+    while max_non_diagonal(m) > eps:
+        num_iteration += 1
+        Q, R = QR_decomposition(m)
+        m = matrices_mul(R, Q)
+        W = matrices_mul(W, Q)
+    # Print
+    print(f'Number of iterations: {num_iteration}')
+    for k in range(n):
+        v = [line[k] for line in W]
+        print(f'lambda_{k + 1} = {simplify_number(m[k][k])} | ', end='')
+        print(f'v_{k + 1} = (' + '; '.join(map(simplify_number, [e / norm_vector(v) for e in v])) + ')')
+
+    # Diagonal matrix
+    d = ['{:.0e}'.format(m[i][i]) for i in range(n)]
+    for i in range(n):
+        print('⌈' if i == 0 else '⌊' if i + 1 == n else '|', end='')
+        for j in range(n):
+            s = '{:.0e}'.format(m[i][j])
+            if m[i][j] > 0:
+                s = ' ' + s
+            print(s + ' ' * (len(d[j]) - len(s) + (3 if j + 1 != n else 1)), end='')
+        print('⌉' if i == 0 else '⌋' if i + 1 == n else '|')
 
 
 def main() -> None:
@@ -340,7 +399,8 @@ def main() -> None:
             # print_vector(reflection_method(A, b))
             # print_iterative(richardson_with_chebyshev_params_method(A, b, l_min, l_max, eps))
             # print('Conjugate gradient:    ', end="") print_iterative(conjugate_gradient_method(A, b))
-            print_power_method(A, eps)
+            # print_power_method(A, eps)
+            QR_algorithm(A, eps)
     except Exception as e:
         print(str(e.__class__)[8:-2] + ': ' + str(e))
 
