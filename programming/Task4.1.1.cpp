@@ -140,8 +140,6 @@ public:
     explicit Let(const string &id, Expression *e_value, Expression *e_body) : id(id), e_value(e_value),
                                                                               e_body(e_body) {
         if (e_value->getType() == function) env[id] = e_value;
-        else
-            error();  // ?
     }
 
     Types getType() override {
