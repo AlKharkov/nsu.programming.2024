@@ -1,5 +1,5 @@
 """
-version: 1.9
+version: 1.10
 Gauss method
 Determinant(with upper triangular form)
 Inverse matrix(with extended matrix form)
@@ -7,11 +7,12 @@ Run-throw method
 Reflection method(Householder's)
 Richardson method with Chebyshev`s params
 Conjugate gradient method
+Power method
 """
 
 
 def simplify_number(n: float, accuracy=8, sign_space=False) -> str:
-    m = str(int(n * 10 ** accuracy) / 10 ** accuracy)
+    m = str(round(n * 10 ** accuracy) / 10 ** accuracy)
     if '.' in m and '9' in m:
         a = m.rindex('9')
         b = a
@@ -22,8 +23,8 @@ def simplify_number(n: float, accuracy=8, sign_space=False) -> str:
                 m = str(int(m[:b - 1]) + 1)
             else:
                 m = m[:b - 1] + str(int(m[b - 1]) + 1)
-    if abs(int(float(m)) - float(m)) < 10 ** (-accuracy // 4):
-        m = str(int(float(m)))
+    if abs(round(float(m)) - float(m)) < 10 ** (-accuracy // 4):
+        m = str(round(float(m)))
     if sign_space:
         return m if m[0] == '-' else ' ' + m
     return m
@@ -44,8 +45,8 @@ def print_matrix(A: list[list[float]], accuracy=8) -> None:  # Print beautiful m
         print('⌉' if i == 0 else '⌋' if i + 1 == n else '|')
 
 
-def print_vector(m: list[float]) -> None:
-    print('x = (' + '; '.join(map(simplify_number, m)) + ')')
+def print_vector(m: list[float], ends='\n') -> None:
+    print('x = (' + '; '.join(map(simplify_number, m)) + ')', end=ends)
 
 
 def is_upper_triangular(m: list[list[float]]) -> bool:
@@ -235,7 +236,7 @@ def vtv_mul(u: list[float], v: list[float]) -> float:
     return sum([u[i] * v[i] for i in range(len(u))])
 
 
-def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None) -> (int, list[float]):
+def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None, eps=10 ** -5) -> (int, list[float]):
     n = len(A)
     if x_prev is None:
         x_prev = [0 for _ in range(n)]
@@ -244,13 +245,15 @@ def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None)
     alpha = vtv_mul(r, g) / vtv_mul(matrix_vector_mul(A, g), g)
     x = vectors_sub(x_prev, num_vector_mul(alpha, g))
     r = vectors_sub(matrix_vector_mul(A, x), b)
-    for i in range(n):
+    num_iteration = 1
+    while norm_vector(r) > eps:
+        num_iteration += 1
         gamma = vtv_mul(matrix_vector_mul(A, r), g) / vtv_mul((matrix_vector_mul(A, g)), g)  # (A * r, g) / (A * g, g)
         g = vectors_sub(r, num_vector_mul(gamma, g))  # g = r - gamma * g
         alpha = vtv_mul(r, g) / (vtv_mul(matrix_vector_mul(A, g), g))
         x = vectors_sub(x, num_vector_mul(alpha, g))
         r = vectors_sub(matrix_vector_mul(A, x), b)
-    return x
+    return num_iteration, x
 
 
 ''' # Three-layer formulas
@@ -276,28 +279,68 @@ def conjugate_gradient_method(A: list[list[float]], b: list[float], x_prev=None)
     return x'''
 
 
+def power_method(A: list[list[float]], eps=10 ** -5) -> (int, float):
+    n = len(A)
+    x_new = [1 for _ in range(n)]
+    num_iteration = 1
+    # for num_iteration in range(100):
+    while norm_vector(vectors_sub(matrix_vector_mul(A, x_new), num_vector_mul(norm_vector(x_new), x_new))) > eps:
+        num_iteration += 1
+        x = x_new
+        x_new = num_vector_mul(1 / norm_vector(x), matrix_vector_mul(A, x))
+    print_vector(num_vector_mul(1 / norm_vector(x_new), x_new))
+    return num_iteration, norm_vector(x_new)
+
+
+def norm_1_matrix(A: list[list[float]]) -> float:
+    n = len(A)
+    return max([sum([A[i][j] for i in range(n)]) for j in range(n)])
+
+
+def matrices_sub(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
+    n = len(A)
+    return [[A[i][j] - B[i][j] for j in range(n)] for i in range(n)]
+
+
+def create_identity(n: int) -> list[list[float]]:
+    return [[1 if i == j else 0 for j in range(n)] for i in range(n)]
+
+
+def num_matrices_mul(k: float, A: list[list[float]]) -> list[list[float]]:
+    n = len(A)
+    return [[k * A[i][j] for j in range(n)] for i in range(n)]
+
+
+def print_power_method(A: list[list[float]], eps: float) -> None:
+    n = len(A)
+    v = power_method(A, eps)
+    print('The number of last iteration:', v[0], '| lambda_max =', simplify_number(v[1]))
+    nA = norm_1_matrix(A)
+    v = power_method(matrices_sub(num_matrices_mul(nA, create_identity(n)), A), eps)
+    print('The number of last iteration:', v[0], '| lambda_min =', simplify_number(nA - v[1]))
+
+
 def main() -> None:
     try:
         with open('input.txt', 'r') as f:
             n = int(f.readline())  # Input size of matrix nxn
             A = [list(map(float, f.readline().split())) for _ in range(n)]  # Input matrix
-            b = list(map(float, f.readline().split()))  # Input vector b
-            '''# l_min, l_max = map(float, f.readline().split()) # for richardson`s method
+            # b = list(map(float, f.readline().split()))  # Input vector b
+            '''# l_min, l_max = map(float, f.readline().split()) # for richardson`s method'''
             eps = f.readline()
             if eps == '\n':
                 eps = 10 ** -5
             else:
-                eps = 10 ** int(eps)'''
+                eps = 10 ** int(eps)
 
-            print('Gauss`s method result: ', end='')
-            print_vector(the_gauss_method(A, b))
+            # print('Gauss`s method result: ', end='') print_vector(the_gauss_method(A, b))
             # print_matrix(inverse_matrix(A))
             # print(det(A))
             # print_vector(run_throw_method(A, b))
             # print_vector(reflection_method(A, b))
             # print_iterative(richardson_with_chebyshev_params_method(A, b, l_min, l_max, eps))
-            print('Conjugate gradient:    ', end='')
-            print_vector(conjugate_gradient_method(A, b))
+            # print('Conjugate gradient:    ', end="") print_iterative(conjugate_gradient_method(A, b))
+            print_power_method(A, eps)
     except Exception as e:
         print(str(e.__class__)[8:-2] + ': ' + str(e))
 
