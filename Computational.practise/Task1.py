@@ -1,5 +1,5 @@
 """
-version: 1.11
+version: 1.12
 Gauss method
 Determinant(with upper triangular form)
 Inverse matrix(with extended matrix form)
@@ -9,6 +9,7 @@ Richardson method with Chebyshev`s params
 Conjugate gradient method
 Power method
 QR-algorithm
+Shifted inverse method
 """
 
 
@@ -47,7 +48,7 @@ def print_matrix(A: list[list[float]], accuracy=8) -> None:  # Print beautiful m
 
 
 def print_vector(m: list[float], ends='\n') -> None:
-    print('x = (' + '; '.join(map(simplify_number, m)) + ')', end=ends)
+    print('(' + '; '.join(map(simplify_number, m)) + ')', end=ends)
 
 
 def is_upper_triangular(m: list[list[float]]) -> bool:
@@ -61,28 +62,29 @@ def is_upper_triangular(m: list[list[float]]) -> bool:
 def to_upper_triangular(A: list[list[float]]) -> list[list[float]]:  # Straight running method Gauss
     n = len(A)
     m = len(A[0])
-    A = [A[i][:] for i in range(n)]
+    matr = [A[i][:] for i in range(n)]
     for k in range(n - 1):
-        ind_max = k + A[k:].index(max(A[k:], key=lambda x: x[k]))  # Swap rows with max element and first not zero
-        c = A[ind_max][:]
-        A[ind_max] = A[k]
-        A[k] = c
-        if A[ind_max] != A[k]:
+        ind_max = k + matr[k:].index(
+            max(matr[k:], key=lambda x: abs(x[k])))  # Swap rows with max element and first not zero
+        c = matr[ind_max][:]
+        matr[ind_max] = matr[k]
+        matr[k] = c
+        if matr[ind_max] != matr[k]:
             for j in range(m):
-                A[ind_max][j] *= -1
-        t = A[k][k]
+                matr[ind_max][j] *= -1
+        t = matr[k][k]
         for i in range(k + 1, n):
             for j in range(m - 1, k - 1, -1):
-                A[i][j] -= A[k][j] * A[i][k] / t
-    return A
+                matr[i][j] -= matr[k][j] * matr[i][k] / t
+    return matr
 
 
-def det(m: list[list[float]]) -> str:  # Return determinant of matrix m
+def det(m: list[list[float]]) -> float:  # Return determinant of matrix m
     if is_upper_triangular(m):
         res = 1
         for i in range(len(m)):
             res *= m[i][i]
-        return simplify_number(res)
+        return res
     return det(to_upper_triangular(m))
 
 
@@ -113,14 +115,14 @@ def check_correct_ax_b(m: list[list[float]], b: list[float]) -> None:
 
 
 def the_gauss_method(A: list[list[float]], b: list[float]) -> list[float]:  # Gauss method with column maximum selection
-    check_correct_ax_b(A, b)
     n = len(A)
     A = [[A[i][j] if j < n else b[i] for j in range(n + 1)] for i in range(n)]  # m = [A|b]
     A = to_upper_triangular(A)  # Straight of gauss method
     # Calculating x
     x = [0.0 for _ in range(n)]
     for i in range(n - 1, -1, -1):
-        x[i] = (A[i][n] - sum([A[i][j] * x[j] for j in range(i + 1, n)])) / A[i][i]
+        # addition for eigenvectors
+        x[i] = (A[i][n] - sum([A[i][j] * x[j] for j in range(i + 1, n)])) / A[i][i] if A[i][i] != 0 else 1
     return x
 
 
@@ -340,11 +342,11 @@ def QR_decomposition(A: list[list[float]]) -> (list[list[float]], list[list[floa
     return Q, R
 
 
-def max_non_diagonal(A: list[list[float]]) -> float:
+def max_low_diagonal(A: list[list[float]]) -> float:
     n = len(A)
     result = 0
     for i in range(n):
-        for j in range(n):
+        for j in range(n // 2):
             if i != j:
                 result = max(result, abs(A[i][j]))
     return result
@@ -355,7 +357,7 @@ def QR_algorithm(A: list[list[float]], eps: float) -> None:
     m = [[line[j] for j in range(n)] for line in A]
     W = create_identity(n)
     num_iteration = 0
-    while max_non_diagonal(m) > eps:
+    while max_low_diagonal(m) > eps:
         num_iteration += 1
         Q, R = QR_decomposition(m)
         m = matrices_mul(R, Q)
@@ -379,28 +381,85 @@ def QR_algorithm(A: list[list[float]], eps: float) -> None:
         print('⌉' if i == 0 else '⌋' if i + 1 == n else '|')
 
 
+def do_vector_last_equal_1(v: list[float]) -> list[float]:
+    if v[-1] == 0:
+        return v
+    return [e / v[-1] for e in v]
+
+
+def do_vector_norm_1(v: list[float]) -> list[float]:
+    x = norm_vector(v)
+    return [e / x for e in v]
+
+
+def matrix_transpose(A: list[list[float]]) -> list[list[float]]:
+    n = len(A)
+    return [[A[j][i] for j in range(n)] for i in range(n)]
+
+
+def shifted_inverse_iteration(A: list[list[float]], alpha=None, eps=10 ** -5, x0=None) -> (float, list[float]):
+    if x0 is None:
+        x0 = [1, 1, 1]
+    if alpha is None:
+        alpha = 4.2
+    n = len(A)
+    x = x0
+    c = 1
+    m = matrices_sub(A, num_matrices_mul(alpha, create_identity(n)))
+    if abs(det(m)) < 10 ** -8:
+        return 0, alpha, do_vector_last_equal_1(the_gauss_method(m, [0 for _ in range(n)]))
+    number_iterations = 0
+    # ||(A - (1/c + alpha) * E) * v|| > eps
+    while norm_vector(matrix_vector_mul(matrices_sub(A, num_matrices_mul(1 / c + alpha, create_identity(n))), x)) > eps:
+        number_iterations += 1
+        y = the_gauss_method(m, x)
+        c = vtv_mul(y, x) / vtv_mul(x, x)
+        x = num_vector_mul(1 / norm_vector(y), y)
+    return number_iterations, 1 / c + alpha, do_vector_last_equal_1(x)
+
+
+def shifted_inverse_method(A: list[list[float]], alphas=None, eps=10 ** -5, x0=None):
+    print('------Shifted inverse method------')
+    if alphas is None:
+        alphas = [4.2]
+    t = len(alphas)
+    n = len(A)
+    if x0 is None:
+        x0 = [[1 for _ in range(n)] for _ in range(t)]
+    for i in range(len(alphas)):
+        num_it, l, v = shifted_inverse_iteration(A, alphas[i], eps, x0[i])
+        print(f'alpha_{i} = {alphas[i]} by {num_it} iterations -> lambda_{i} = {simplify_number(l)}; v_{i} = ', end='')
+        print_vector(v)
+
+
 def main() -> None:
     try:
         with open('input.txt', 'r') as f:
-            n = int(f.readline())  # Input size of matrix nxn
-            A = [list(map(float, f.readline().split())) for _ in range(n)]  # Input matrix
+            t = list(map(float, f.readline().split()))
+            n = len(t)
+            A = [t if i == 0 else list(map(float, f.readline().split())) for i in range(n)]  # Input matrix
             # b = list(map(float, f.readline().split()))  # Input vector b
             '''# l_min, l_max = map(float, f.readline().split()) # for richardson`s method'''
             eps = f.readline()
             if eps == '\n':
-                eps = 10 ** -5
+                eps = 10 ** -8
             else:
                 eps = 10 ** int(eps)
 
+            alphas = list(map(float, f.readline().split()))
+            if len(alphas) == 0:
+                alphas = [4.2]
+
             # print('Gauss`s method result: ', end='') print_vector(the_gauss_method(A, b))
             # print_matrix(inverse_matrix(A))
-            # print(det(A))
+            # print(simplify_number(det(A)))
             # print_vector(run_throw_method(A, b))
             # print_vector(reflection_method(A, b))
             # print_iterative(richardson_with_chebyshev_params_method(A, b, l_min, l_max, eps))
             # print('Conjugate gradient:    ', end="") print_iterative(conjugate_gradient_method(A, b))
             # print_power_method(A, eps)
-            QR_algorithm(A, eps)
+            # QR_algorithm(A, eps)
+            shifted_inverse_method(A, alphas, eps, [[1 for _ in range(n)]])
     except Exception as e:
         print(str(e.__class__)[8:-2] + ': ' + str(e))
 
