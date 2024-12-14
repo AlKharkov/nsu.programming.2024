@@ -1,9 +1,8 @@
 /*
  * Variant 5.1.1
- * version 1.1
+ * version 1.5
  *
- * Single-threading crawler
- * --Multithreading crawler
+ * Multithreading crawler
  */
 
 #include <iostream>
@@ -11,16 +10,23 @@
 #include <unordered_set>
 #include <fstream>
 #include <ctime>
+#include <thread>
+#include <vector>
+#include <mutex>
 
 using namespace std;
 namespace fs = filesystem;
 
-const string name_folder = "crawler_saved_files";
-fs::path pathTo = fs::path{R"(C:\Users\aleks\Downloads)"} / name_folder;  // fs::current_path();
-fs::path pathFrom = fs::path{R"(C:\Users\aleks\Downloads\test_data)"};
+fs::path sourcePath = fs::path(R"(C:\Users\aleks\Downloads\todo)");  // fs::current_path() <- maybe
+fs::path pathTo = sourcePath / "to";
+fs::path pathFrom = sourcePath / "from";
 unordered_set<string> all_files;  // All files by pathFrom
 unordered_set<string> checked_files;  // All files after 'check_file()'
 unordered_set<string> rest_files;  // Needs to check
+int number_actives = 0;
+vector<thread *> threads;
+int n;
+mutex m1, m2;
 
 
 bool starts_with(const string &s, const string &a) {  // s == a + s[n:]?
@@ -33,7 +39,7 @@ bool starts_with(const string &s, const string &a) {  // s == a + s[n:]?
 
 bool ends_with(const string &s, const string &a) {  // s == s[:-n] + a?
     if (a.size() > s.size()) return false;
-    for (int i = 0; i << a.size(); ++i) {
+    for (int i = 0; i < a.size(); ++i) {
         if (s.rbegin()[i] != a.rbegin()[i]) return false;
     }
     return true;
@@ -52,42 +58,50 @@ int custom_find(const string &s, const string &a) {  // If a not in s -> -1. Els
 // Выбирает файл из rest_files, если ранее с ним не работали, начинает работать: находит все ссылки в нем.
 // Далее копирует соответствующие документы в директорию(якобы скачивает) и добавляет названия в rest_files
 void check_file() {
-    while (!rest_files.empty()) {
-        string source_filename = *rest_files.begin();
-        rest_files.erase(rest_files.begin());
-        if (!checked_files.contains(source_filename)) {
-            checked_files.emplace(source_filename);
-            ifstream inlet((pathTo / source_filename).string());
-            string s;
-            while (inlet >> s) {
-                if (ends_with(s, "<a")) {
-                    inlet >> s;
-                    if (starts_with(s, "href=\"")) {
-                        int ind_end = custom_find(s, "\">");
-                        if (ind_end != -1) {
-                            string new_filename = s.substr(6, ind_end - 6);
-                            if (starts_with(new_filename, "file://")) {
-                                new_filename = new_filename.substr(7, new_filename.size() - 7);
-                                if (!checked_files.contains(new_filename) && all_files.contains(new_filename) &&
-                                    !rest_files.contains(new_filename)) {
-                                    fs::copy(pathFrom / new_filename, pathTo / new_filename);
-                                    rest_files.emplace(new_filename);
+    while (true) {
+        m1.lock();
+        if (!rest_files.empty()) {
+            ++number_actives;
+            string source_filename = *rest_files.begin();
+            rest_files.erase(source_filename);
+            if (!checked_files.contains(source_filename)) {
+                checked_files.emplace(source_filename);
+                m1.unlock();
+                ifstream inlet((pathTo / source_filename).string());
+                string s;
+                while (inlet >> s) {
+                    if (ends_with(s, "<a")) {
+                        inlet >> s;
+                        if (starts_with(s, "href=\"")) {
+                            int ind_end = custom_find(s, "\">");
+                            if (ind_end != -1) {
+                                string new_filename = s.substr(6, ind_end - 6);
+                                if (starts_with(new_filename, "file://")) {
+                                    new_filename = new_filename.substr(7, new_filename.size() - 7);
+                                    lock_guard<mutex> lock(m2);
+                                    if (!checked_files.contains(new_filename) && all_files.contains(new_filename) &&
+                                        !rest_files.contains(new_filename)) {
+                                        fs::copy(pathFrom / new_filename, pathTo / new_filename);
+                                        rest_files.emplace(new_filename);
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            inlet.close();
+                inlet.close();
+            } else m1.unlock();
+            --number_actives;
+        } else {
+            m1.unlock();
+            if (number_actives == 0) break;
         }
     }
 }
 
 int main() {
     string s;
-    cin >> s;
-    int n;
-    // cin >> n;
+    cin >> s >> n;
 
     unsigned int start_time = clock();
     for (const fs::directory_entry &dir: fs::directory_iterator(pathFrom)) {
@@ -100,10 +114,21 @@ int main() {
     fs::copy(pathFrom / s, pathTo / s);
     rest_files.emplace(s);
 
-    check_file();
+    for (int i = 0; i < n; ++i) threads.emplace_back(new thread(check_file));
+
+    for (thread *x: threads) x->join();
 
     fs::remove_all(pathTo);
-    cout << "Program was viewed " << checked_files.size() << " files. ";
-    cout << "It was working " << clock() - start_time << " ms" << endl;
+    cout << checked_files.size() << ' ' << clock() - start_time << endl;
     return 0;
 }
+/* s = "0.html"
+ * number_threads | operation_time
+ *      1         |      3406
+ *      2         |      2148
+ *      3         |      1723
+ *      4         |      1639
+ *      5         |      1572
+ *      6         |      1475
+ *      7         |      1553
+ */
