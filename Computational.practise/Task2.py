@@ -48,8 +48,8 @@ def task11():
     print(f'Pa({x}) - Pb({x}) = {simpN(Pa(x) - Pb(x))} - разность значений полученных многочленов в точке х')
     tabular = simpN(exp(x), 5)
     print(f'exp({x}) = {tabular} - табличное значение')
-    print(f'exp({x}) - Pa({x}) = {simpN(tabular - Pa(x))} - погрешность вычисления в случае a)')
-    print(f'exp({x}) - Pb({x}) = {simpN(tabular - Pb(x))} - погрешность вычисления в случае b)')
+    print(f'Ra({x}) = exp({x}) - Pa({x}) = {simpN(tabular - Pa(x))} - погрешность вычисления в случае a)')
+    print(f'Rb({x}) = exp({x}) - Pb({x}) = {simpN(tabular - Pb(x))} - погрешность вычисления в случае b)')
 
 
 def interpolationNewton(args: list[float], values: list[float]) -> Poly:
@@ -90,9 +90,9 @@ def task12():
     print(f'Pb({x}) - Pc({x}) = {simpN(Pb(x) - Pc(x))}')
     tabular = simpN(log10(x), 4)
     print(f'lg({x}) = {tabular} - табличное значение')
-    print(f'lg({x}) - Pa({x}) = {simpN(tabular - Pa(x))} - погрешность вычисления в случае a)')
-    print(f'lg({x}) - Pb({x}) = {simpN(tabular - Pb(x))} - погрешность вычисления в случае b)')
-    print(f'lg({x}) - Pc({x}) = {simpN(tabular - Pc(x))} - погрешность вычисления в случае c)')
+    print(f'Ra({x}) = lg({x}) - Pa({x}) = {simpN(tabular - Pa(x))} - погрешность вычисления в случае a)')
+    print(f'Rb({x}) = lg({x}) - Pb({x}) = {simpN(tabular - Pb(x))} - погрешность вычисления в случае b)')
+    print(f'Rc({x}) = lg({x}) - Pc({x}) = {simpN(tabular - Pc(x))} - погрешность вычисления в случае c)')
 
 
 if __name__ == '__main__':
