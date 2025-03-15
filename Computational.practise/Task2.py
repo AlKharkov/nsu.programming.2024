@@ -1,5 +1,5 @@
 """
-version: 1.3.0
+version: 1.3.1
 
 Interpolation polynomial in Lagrange form
 Interpolation polynomial in Newton form
@@ -56,12 +56,12 @@ def task11():
 
 def interpolationNewton(args: list[float], values: list[float]) -> Poly:
     n = len(args) - 1
-    div_dif = [[0 for _ in range(i + 1)] for i in range(n + 1)]  # Divided differences
+    div_dif = [[0 for _ in range(n + 1)] for i in range(n + 1)]  # Divided differences
     for i in range(n + 1):
         div_dif[i][0] = values[i]
     for j in range(1, n + 1):
         for i in range(j, n + 1):
-            div_dif[i][j] = (div_dif[i][j - 1] - div_dif[i - 1][j - 1]) / (args[i] - args[i - 1])
+            div_dif[i][j] = (div_dif[i][j - 1] - div_dif[i - 1][j - 1]) / (args[i] - args[abs(i - j)])
     Pn = Poly(values[0])
     t = Poly(1)
     for i in range(1, n + 1):
@@ -135,7 +135,7 @@ def task13():
     valuesE = list()
     valuesC = list()
     point = a
-    number_sections = 10 ** 2
+    number_sections = 10 ** 4
     delta = (b - a) / number_sections
     xMaxE = 0
     xMaxC = 0
@@ -160,8 +160,8 @@ def task13():
     print(f'достигается в точке {simpN(xMaxE)} и составляет {simpN(maxMistakeE)}')
     print(f'Для узлов Чебышева: {simpN(xMaxC)} и составляет {simpN(maxMistakeC)}')
 
-    plt.plot(args, valuesE)
-    plt.plot(args, valuesC)
+    plt.plot(args, [abs(valuesE[i] - exp(args[i])) for i in range(len(args))])
+    plt.plot(args, [abs(valuesC[i] - exp(args[i])) for i in range(len(args))])
     plt.title('Interpolation polynomials')
     plt.xlabel('Arg of function: x')
     plt.ylabel('Value of function: exp(x)')
