@@ -1,12 +1,17 @@
 """
-version: 1.3.1
+version: 2.3.1
 
+Task 1:
 Interpolation polynomial in Lagrange form
 Interpolation polynomial in Newton form
 Interpolation polynomial in Lagrange form with Chebyshev`s nodes
-"""
 
-from math import exp, log10, cos, pi
+Task 2:
+Formula for the average rectangles, trapezoid, Simpson
+Gaussian quadratures
+"""
+import math
+from math import exp, log10, cos, pi, sqrt
 from numpy.polynomial import Polynomial as Poly
 import matplotlib.pyplot as plt
 
@@ -170,5 +175,118 @@ def task13():
     plt.show()
 
 
+def average_rectangles_formula(f, a: float, b: float, n: int) -> float:
+    h = (b - a) / n
+    xk = lambda k: a + k * h
+    return sum([f((xk(i) + xk(i - 1)) / 2) for i in range(1, n + 1)]) * h
+
+
+def trapezoid_formula(f, a: float, b: float, n: int) -> float:
+    h = (b - a) / n
+    xk = lambda k: a + k * h
+    return sum([f(xk(i)) + f(xk(i - 1)) for i in range(1, n + 1)]) * h / 2
+
+
+def simpson_formula(f, a: float, b: float, n: int) -> float:
+    h = (b - a) / n
+    xk = lambda k: a + k * h
+    return sum([f(xk(i)) + 4 * f((xk(i) + xk(i - 1)) / 2) + f(xk(i - 1)) for i in range(1, n + 1)]) * h / 6
+
+
+def task22():
+    f = lambda x: sqrt(2 * x + 1)
+    a, b = 0, 1
+    I = sqrt(3) - 1 / 3
+    print(f'"Идеальное"(табличное) значение интеграла I = {simpN(I)}')
+    print('------------------------------------------------------------------------------------------------------')
+
+    print('Значение квадратурной формулы центральных прямоугольников при:')
+    I20 = average_rectangles_formula(f, a, b, 20)
+    print(f'n = 20 равняется I_20={simpN(I20)}. Ошибка равняется I - I_20 = {simpN(I - I20)}')
+    I50 = average_rectangles_formula(f, a, b, 50)
+    print(f'n = 50 равняется I_50={simpN(I50)}. Ошибка равняется I - I_50 = {simpN(I - I50)}')
+    I100 = average_rectangles_formula(f, a, b, 100)
+    print(f'n = 100 равняется I_100={simpN(I100)}. Ошибка равняется I - I_100 = {simpN(I - I100)}')
+    print('------------------------------------------------------------------------------------------------------')
+    print('Значение квадратурной формулы трапеций при:')
+    I20 = trapezoid_formula(f, a, b, 20)
+    print(f'n = 20 равняется I_20={simpN(I20)}. Ошибка равняется I - I_20 = {simpN(I - I20)}')
+    I50 = trapezoid_formula(f, a, b, 50)
+    print(f'n = 50 равняется I_50={simpN(I50)}. Ошибка равняется I - I_50 = {simpN(I - I50)}')
+    I100 = trapezoid_formula(f, a, b, 100)
+    print(f'n = 100 равняется I_100={simpN(I100)}. Ошибка равняется I - I_100 = {simpN(I - I100)}')
+    print('------------------------------------------------------------------------------------------------------')
+    print('Значение квадратурной формулы Симпсона при:')
+    I20 = simpson_formula(f, a, b, 20)
+    print(f'n = 20 равняется I_20={simpN(I20)}. Ошибка равняется I - I_20 = {simpN(I - I20)}')
+    I50 = simpson_formula(f, a, b, 50)
+    print(f'n = 50 равняется I_50={simpN(I50)}. Ошибка равняется I - I_50 = {simpN(I - I50)}')
+    I100 = simpson_formula(f, a, b, 100)
+    print(f'n = 100 равняется I_100={simpN(I100)}. Ошибка равняется I - I_100 = {simpN(I - I100)}')
+
+
+def gauss_2_nodes(f, a: float, b: float) -> float:
+    c = (a + b) / 2
+    print('Узлы квадратурной формулы:')
+    x0, x1 = c - (b - a) / 2 / sqrt(3), c + (b - a) / 2 / sqrt(3)
+    print(f'x0 = {simpN(x0)} | x1 = {simpN(x1)}')
+    print('Значения функции в этих узлах:')
+    print(f'f(x0) = {simpN(f(x0))} | f(x1) = {simpN(f(x1))}')
+    print('Коэффициенты квадратурной формулы:')
+    print(f'A0 = (b - a) / 2 = {(b - a) / 2} = A1')
+    return (f(c - (b - a) / 2 / sqrt(3)) + f(c + (b - a) / 2 / sqrt(3))) * (b - a) / 2
+
+
+def gauss_3_nodes(f, a: float, b: float) -> float:
+    print('Узлы квадратурной формулы:')
+    d1, d2 = 0, 0.7745966692
+    d_to_x = lambda d: (d * (b - a) + a + b) / 2
+    D1, D2 = 0.8888888888, 0.5555555556
+    x0, x1, x2 = d_to_x(-d2), d_to_x(d1), d_to_x(d2)
+    print(f'x0 = {simpN(x0)} | x1 = {simpN(x1)} | x2 = {simpN(x2)}')
+    print('Значения функции в этих узлах:')
+    print(f'f(x0) = {simpN(f(x0))} | f(x1) = {simpN(f(x1))} | f(x2) = {simpN(f(x2))}')
+    print('Коэффициенты квадратурной формулы:')
+    print(f'A0 = {D1 / 2} = A2 | A1 = {D2 / 2}')
+    return (D2 * f(x0) + D1 * f(x1) + D2 * f(x2)) * (b - a) / 2
+
+
+def gauss_5_nodes(f, a: float, b: float) -> float:
+    print('Узлы квадратурной формулы:')
+    d1, d2, d3 = 0, 0.5384693101, 0.9061798459
+    d_to_x = lambda d: (d * (b - a) + a + b) / 2
+    D1, D2, D3 = 0.5688888888, 0.4786286705, 0.2369268851
+    x0, x1, x2, x3, x4 = d_to_x(-d3), d_to_x(-d2), d_to_x(d1), d_to_x(d2), d_to_x(d3)
+    print(f'x0 = {simpN(x0)} | x1 = {simpN(x1)} | x2 = {simpN(x2)} | x3 = {simpN(x3)} | x4 = {simpN(x4)}')
+    print('Значения функции в этих узлах:')
+    print(f'f(x0) = {simpN(f(x0))} | f(x1) = {simpN(f(x1))} |'
+          f' f(x2) = {simpN(f(x2))} | f(x3) = {simpN(f(x3))} | f(x4) = {simpN(x4)}')
+    print('Коэффициенты квадратурной формулы:')
+    print(f'A0 = {D3 / 2} = A4 | A1 = {D2 / 2} = A3 | A2 = {D1 / 2}')
+    return (D3 * f(x0) + D2 * f(x1) + D1 * f(x2) + D2 * f(x3) + D3 * f(x4)) * (b - a) / 2
+
+
+def task23():
+    f = lambda x: sqrt(2 * x + 1)
+    a, b = 0, 1
+    I = sqrt(3) - 1 / 3
+    print(f'"Идеальное"(табличное) значение интеграла I = {simpN(I)}')
+    print('------------------------------------------------------------------------------------------------------')
+    print(f'Квадратура Гаусса на 2 узлах:')
+    I2 = gauss_2_nodes(f, a, b)
+    print(f'Значение квадратуры I2 = {simpN(I2)}')
+    print(f'Полученная ошибка вычисления составляет R2 = {simpN(I - I2)}')
+    print('------------------------------------------------------------------------------------------------------')
+    print('Квадратура Гаусса на 3 узлах:')
+    I3 = gauss_3_nodes(f, a, b)
+    print(f'Значение квадратуры I3 = {simpN(I3)}')
+    print(f'Полученная ошибка вычисления составляет R3 = {simpN(I - I3)}')
+    print('------------------------------------------------------------------------------------------------------')
+    print('Квадратура Гаусса на 5 узлах:')
+    I5 = gauss_5_nodes(f, a, b)
+    print(f'Значение квадратуры I5 = {simpN(I5)}')
+    print(f'Полученная ошибка вычисления составляет R5 = {simpN(I - I5)}')
+
+
 if __name__ == '__main__':
-    task13()
+    task23()
