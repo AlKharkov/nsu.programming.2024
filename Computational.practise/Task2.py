@@ -1,5 +1,5 @@
 """
-version: 2.3.1
+version: 3.1.1
 
 Task 1:
 Interpolation polynomial in Lagrange form
@@ -9,8 +9,11 @@ Interpolation polynomial in Lagrange form with Chebyshev`s nodes
 Task 2:
 Formula for the average rectangles, trapezoid, Simpson
 Gaussian quadratures
+
+Task 3:
+The dichotomy method
+The Newton method
 """
-import math
 from math import exp, log10, cos, pi, sqrt
 from numpy.polynomial import Polynomial as Poly
 import matplotlib.pyplot as plt
@@ -288,5 +291,37 @@ def task23():
     print(f'Полученная ошибка вычисления составляет R5 = {simpN(I - I5)}')
 
 
+def dichotomy(f, a: float, b: float, eps=10 ** -8) -> (float, int):
+    x = (a + b) / 2
+    num_iter = 0
+    while abs(f(x)) > eps:
+        num_iter += 1
+        if f(a) * f(x) < 0:
+            b = x
+        else:
+            a = x
+        x = (a + b) / 2
+    return x, num_iter
+
+
+def the_Newton_method(f, df, x0: float, eps=10 ** -8) -> (float, int):
+    x = x0
+    num_iter = 0
+    while abs(f(x)) > eps:
+        num_iter += 1
+        x -= f(x) / df(x)
+    return x, num_iter
+
+
+def task31():
+    f = lambda x: exp(x) + x
+    df = lambda x: exp(x) + 1
+    a, b = -1, 1
+    x1, n1 = dichotomy(f, a, b)
+    print(f'Метод дихотомии нашел корень: {x1} за {n1} итераций')
+    x2, n2 = the_Newton_method(f, df, 0)
+    print(f'Метод Ньютона нашел корень: {x2} за {n2} итераций')
+
+
 if __name__ == '__main__':
-    task23()
+    task31()
