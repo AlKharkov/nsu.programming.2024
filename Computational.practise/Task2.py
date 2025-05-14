@@ -1,5 +1,5 @@
 """
-version: 3.1.1
+version: 3.2.3
 
 Task 1:
 Interpolation polynomial in Lagrange form
@@ -14,22 +14,13 @@ Task 3:
 The dichotomy method
 The Newton method
 """
-from math import exp, log10, cos, pi, sqrt
+from math import exp, log10, cos, pi, sqrt, log
 from numpy.polynomial import Polynomial as Poly
 import matplotlib.pyplot as plt
 
 
 def simpN(n: int | float, count=8) -> int | float:
-    if abs(n) <= 10 ** -count:
-        cnt = 0
-        while n < 1:
-            n *= 10
-            cnt += 1
-        return simpN(n, 0) / 10 ** cnt
-    t = n * 10 ** count
-    if t % 1 >= 0.5:
-        return int(t + 0.5) / 10 ** count
-    return int(t) / 10 ** count
+    return (n * 10 ** (count + 4) + 5555) // 10 ** 4 / 10 ** count
 
 
 def interpolationLagrange(args: list[int | float], values: list[int | float]) -> Poly:
@@ -294,7 +285,7 @@ def task23():
 def dichotomy(f, a: float, b: float, eps=10 ** -8) -> (float, int):
     x = (a + b) / 2
     num_iter = 0
-    while abs(f(x)) > eps:
+    while b > a and b - a > eps:
         num_iter += 1
         if f(a) * f(x) < 0:
             b = x
@@ -305,12 +296,16 @@ def dichotomy(f, a: float, b: float, eps=10 ** -8) -> (float, int):
 
 
 def the_Newton_method(f, df, x0: float, eps=10 ** -8) -> (float, int):
-    x = x0
+    x_np1 = x0
     num_iter = 0
-    while abs(f(x)) > eps:
+    x_n = x_np1 + 2
+    x_nm1 = x_n + 8
+    while abs((x_np1 - x_n) / (1 - (x_np1 - x_n) / (x_n - x_nm1))) > eps:
         num_iter += 1
-        x -= f(x) / df(x)
-    return x, num_iter
+        x_nm1 = x_n
+        x_n = x_np1
+        x_np1 -= f(x_np1) / df(x_np1)
+    return x_np1, num_iter
 
 
 def task31():
@@ -323,5 +318,46 @@ def task31():
     print(f'Метод Ньютона нашел корень: {x2} за {n2} итераций')
 
 
+def draw_graphic(a: float, b: float, n=10 ** 6):
+    f = lambda x: x ** 3 - x
+    h = (b - a) / n
+    args = [a + i * h for i in range(n)]
+    values = [f(arg) for arg in args]
+    plt.plot(args, values)
+    plt.title('Graphic')
+    plt.xlabel('Arg x')
+    plt.ylabel('The value of x ** 3 - x')
+    plt.grid()
+    plt.show()
+
+
+def draw32(a: float, b: float, needIterations=False, n=10 ** 6):
+    f = lambda x: x ** 3 - x
+    df = lambda x: 3 * x ** 2 - 1
+    h = (b - a) / n
+    args = [a + i * h for i in range(n)]
+    values = [the_Newton_method(f, df, arg) for arg in args]
+    valuesX = [value[0] for value in values]
+    valuesN = [value[1] for value in values]
+    plt.plot(args, valuesX)
+    plt.title('The Newton method values')
+    plt.xlabel('First x: x0')
+    plt.ylabel('Value of the Newton method: ')
+    plt.grid()
+    plt.show()
+    if needIterations:
+        plt.plot(args, valuesN)
+        plt.title('The number of iterations')
+        plt.xlabel('First x: x0')
+        plt.ylabel('The number of iterations: ')
+        plt.grid()
+        plt.show()
+
+
+def task32():
+    draw32(-100, 100, True)
+    draw32(-1, 1)
+
+
 if __name__ == '__main__':
-    task31()
+    task32()
