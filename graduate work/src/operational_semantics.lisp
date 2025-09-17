@@ -15,7 +15,7 @@ Operational semantics of Go
 (obj "variable" :union ("name"))  ; x | y | p  ; :at "type" "type" ???
 
 (cpath ("Go" "constants"))
-(obj "constant" :union (int))  ; 0 | 2  ; :at "type" "type" ???
+(obj "constant" :union (int bool real))  ; 0 | 2  ; :at "type" "type" ???
 
 (cpath ("Go" "types"))
 (obj "bool type" :enum ("bool"))
@@ -27,8 +27,12 @@ Operational semantics of Go
 (obj "complex type" :enum ("complex32" "complex64"))
 (obj "numeric type" :union ("real-valued type" "complex type"))
 (obj "string type" :union ("string"))
+(obj "byte type" :enum ("byte"))  ; alias for uint8
+(obj "rune type" :enum ("rune"))  ; alias for int32
+(obj "base type" :union ("bool type" "numeric type" "string type" "byte type" "rune type"))
 (obj "pointer type" :at "type" "type")
-(obj "type" :union ("bool type" "numeric type" "string type" "pointer type"))
+(obj "array type" :at "type" "type" :at "len" int)  ; ???
+(obj "type" :union ("base type" "pointer type" "array type"))
 
 (cpath ("Go" "expressions"))
 (obj "address expression" :at "variable" "variable")  ; &x
@@ -44,13 +48,9 @@ Operational semantics of Go
 
 (cpath ("Go" "statements"))
 (obj "expression statement" :at "expression" "expression")
-(obj "block statement" :at "statements" (listt "statement"))
-(obj "if statement simple" :at "condition" "expression" :at "then" "statement")  ; if <condition> { <then> }
-(obj "if-else statement" :at "condition" "expression" :at "then" "statement" :at "else" "expression")  ; if <condition> { <then> } else { <else> }
-(obj "if statement" :union ("is statement simple" "if-else statement"))
-(obj "variable declaration simple" :at "type" "type" :at "name" "name")  ; var x int
-(obj "variable declaration full" :at "type" "type" :at "name" "name" :at "initiliazer" "expression")  ; var x int = 3
-(obj "variable declaration short" :at "name" "name" :at "initiliazer" "expression")  ; x := 0 ???
-(obj "variable declaration" :union ("variable declaration simple" "variable declaration full" "variable declaration short"))
+(obj "block statement" :at "statements" (listt "expression"))  ; "statement" ???
+(obj "if statement" :at "condition" "expression" :at "then" "expression" :at "else" "expression")  ; if <condition> { <then> } else { <else> }
+(obj "variable declaration" :at "type" "type" :at "name" "name" :at "initiliazer" "expression")  ; var x int = 3
+(obj "for statement" :at "init statement" "expression" :at "condition" "expression" :at "post statement" "expression" :at "body" "expression")
 (obj "statement" :union ("expression statement" "block statement" "if statement" "variable declaration"))
 
