@@ -1,5 +1,5 @@
 #|
-	Operational semantics of Go
+	Operational semantics of the Go language
 |#
 
 
