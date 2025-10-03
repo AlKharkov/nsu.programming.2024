@@ -2,13 +2,11 @@
 	Model of the Go language
 |#
 
-
-;; Comments
+;; Lexical elements
+;comments
 (obj "line comment" :at "text" string)  ; // single-line comment
 (obj "general comment" :at "text" string)  ; /* multi-line comment */
-
-
-;; Identifiers
+;identifiers
 (obj "identifier" :union (string))  ; <doc> letter { letter | unicode_digit }
 
 
@@ -25,9 +23,10 @@
 
 ;; Types
 (obj "type" :union ("base type" "composite type"))
-;base type
+;base types
 (obj "base type" :union ("boolean type" "numeric type" "string type"))
 (obj "boolean type" :enum ("bool"))
+;numeric types
 (obj "numeric type" :union ("real-valued type" "complex type" "byte type" "rune type"))
 (obj "real-valued type" :enum ("int type" "float type"))
 (obj "int type" :union ("signed int type" "unsigned int type"))
@@ -37,6 +36,7 @@
 (obj "complex type" :enum ("complex32" "complex64"))
 (obj "byte type" :enum ("byte"))  ; <doc> alias for uint8
 (obj "rune type" :enum ("rune"))  ; <doc> alias for int32
+;string types
 (obj "string type" :enum ("string"))
 ;composite types
 (obj "composite type" :union ("array type" "slice type" "struct type" "pointer type" "function type" "interface type" "map type" "channel type"))
@@ -47,17 +47,22 @@
 (obj "named field" :at "name" "identifier" :at "type" "type")
 (obj "embedded field" :at "type" "type")
 (obj "pointer type" :at "type" "type")
+;function types
 (obj "function type" :at "signature" "signature")
 (obj "signature" :at "parameters" "parameters" :at "result" "result")
-(obj "parameters" :at "parameter list" (listt "parameter decl"))
+(obj "parameters" :union((listt "parameter decl")))
 (obj "paramater decl" :at "identifier" "identifier" :at "type" :at "type")
 (obj "result" :union ("parameters" "type"))
-(obj "interface type" :at "elements" (listt "interface element"))
-(obj "interface element" :union ("method elem" (listt "type term")))
+;interface types
+(obj "interface type" :at "elements" (listt "interface elem"))
+(obj "interface eleme" :union ("method elem" "type elem"))
+(obj "type elem" :union ((listt "type term")))
 (obj "method elem" :at "name" "identifier" :at "signature" "signature")
 (obj "type term" :union ("type" "underlying type"))
 (obj "underlying type" :at "type" "type")  ; ~Type
+;map types
 (obj "map type" :at "key type" :at "element type" "type")
+;channel types
 (obj "channel type" :at "chan" :at "type" "type" :at "direction" "direction")
 (obj "direction" :enum ("send" "recieve" "bidirectional"))
 (obj "send")  ; chan<- Type
@@ -66,27 +71,36 @@
 
 
 ;; Blocks
-(obj "block" :union ((listt "statement list")))
+(obj "block" :union ("statement list"))
 (obj "statement list" :union ((listt "statement")))
 
 
 ;; Declarations
 (obj "declaration" :union ("const decl" "type decl" "var decl"))
 (obj "top level decl" :union ("declaration" "function decl" "method decl"))
+;const decl
 (obj "const decl" :union((listt "const spec")))
-(obj "const spec" :at "identifier" "identifier" :at "type" "type" :at "expression" "expression")
+(obj "const spec" :at "id list" "id list" :at "type" "type" :at "expr list" "expr list")
+(obj "id list" :union ((listt "identifier")))
+(obj "expr list" :union ((listt "expression")))
+;type decl
 (obj "type decl" :union ((listt "type spec")))
 (obj "type spec" :union ("alias decl" "type def"))
-(obj "alias decl" :at "identifier" "identifier" :at "type parameters" "type parameters")
-(obj "type parameters" :union ((listt "type param decl")))
-(obj "type param decl" :union ((listt "identifier")) "type constraint")
-(obj "type constraint" :union ((listt "type term")))
+(obj "alias decl" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "type" "type")
+(obj "type parameters" :union ("type param list"))
+(obj "type param list" :union ((listt "type param decl")))
+(obj "type param decl" :at "id list" "id list" :at "type constraint" "type constraint")
+(obj "type constraint" :union ("type elem"))
 (obj "type def" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "type" "type")
+;var decl
 (obj "var decl" :union ((listt "var spec")))
-(obj "var spec" :at "identifier" "identifier" :at "type" "type" :at "expression" "expression")
-(obj "short var decl" :at "identifier" "identifier" :at "expression" "expression")
-(obj "function decl" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "signature" "signature" :at "body" "block")
-(obj "method decl" :at "reciever" "parameters" :at "name" "identifier" :at "signature" "signature" :at "body" "block")
+(obj "var spec" :at "id list" "id list" :at "type" "type" :at "expr list" "expr list")
+(obj "short var decl" :at "id list" "id list" :at "expr list" "expr list")
+;function decl
+(obj "function decl" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "signature" "signature" :at "body" "function body")
+(obj "function body" :union("block"))
+;method decl
+(obj "method decl" :at "reciever" "parameters" :at "name" "identifier" :at "signature" "signature" :at "body" "function body")
 
 
 ;; Expressions
@@ -205,8 +219,6 @@
 (obj "for clause" :at "init" "simple stmt" :at "condition" "condition" :at "post" "simple stmt")
 (obj "range clause" :at "location" "expr list | id list" :at "expression" "expression")
 (obj "expr list | id list" :union ("expr list" "id list"))
-(obj "expr list" :union ((listt "expression")))
-(obj "id list" :union ((listt "identifier")))
 (obj "go stmt" :union (("expression")))
 (obj "select stmt" :union("common slause"))
 (obj "common clause" :at "case" "common case" :at "stmt list" "stmt list")
