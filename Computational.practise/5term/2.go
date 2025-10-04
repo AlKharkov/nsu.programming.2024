@@ -14,7 +14,18 @@ import (
 )
 
 func main() {
-	h, tau := 0.001, 0.001
+	solve(0.1, 0.1, false)
+	solve(0.1, 0.01, false)
+	solve(0.1, 0.001, false)
+	solve(0.01, 0.1, false)
+	solve(0.01, 0.01, false)
+	solve(0.01, 0.001, false)
+	solve(0.001, 0.1, false)
+	solve(0.001, 0.01, false)
+	solve(0.001, 0.001, true)
+}
+
+func solve(h, tau float64, needPrint bool) {
 	Nh, Nt := int(math.Round(1/h))+1, int(math.Round(1/tau))+1
 	// Input data
 	ux0 := func(x float64) float64 { return (x+0.1)*(x+0.1) + x }
@@ -46,17 +57,17 @@ func main() {
 		for k := 1; k < Nh-1; k++ {
 			switch k {
 			case 1:
-				p := tau * fToGrid(cxt, k, j) / 4 / h
+				p := tau * (fToGrid(cxt, k, j) + fToGrid(cxt, k, j+1)) / 8 / h
 				vector[0] = uGrid[k][j] + p*(uGrid[k-1][j+1]+uGrid[k-1][j]-uGrid[k+1][j])
 				matrix[0][0] = 1
 				matrix[0][1] = p
 			case Nh - 2:
-				p := 4 * h / tau / fToGrid(cxt, k, j)
+				p := 8 * h / tau / (fToGrid(cxt, k, j) + fToGrid(cxt, k, j+1))
 				vector[k-1] = uGrid[k+1][j+1] - uGrid[k-1][j] + uGrid[k+1][j] - p*uGrid[k][j]
 				matrix[k-1][k-2] = 1
 				matrix[k-1][k-1] = -p
 			default:
-				p := 4 * h / tau / fToGrid(cxt, k, j)
+				p := 8 * h / tau / (fToGrid(cxt, k, j) + fToGrid(cxt, k, j+1))
 				vector[k-1] = uGrid[k+1][j] - uGrid[k-1][j] - p*uGrid[k][j]
 				matrix[k-1][k-2] = 1
 				matrix[k-1][k-1] = -p
@@ -75,36 +86,36 @@ func main() {
 			maximumDeviation = max(maximumDeviation, math.Abs(uGrid[k][j]-fToGrid(uAns, k, j)))
 		}
 	}
-	fmt.Println("--------Task 1--------")
-	fmt.Printf("Maximum deviation: %f\n\n", maximumDeviation)
+	fmt.Printf("tau=%.0e, h=%.0e: %f / %.2e\n", round(tau, 6), round(h, 6), maximumDeviation, maximumDeviation)
+	if needPrint {
+		//fmt.Println("--------Task 2--------")
+		//showMatrix(uGrid)
+		showMatrix(make([][]float64, 0))
+		fmt.Println()
 
-	//fmt.Println("--------Task 2--------")
-	//showMatrix(uGrid)
-	showMatrix(make([][]float64, 0))
-	fmt.Println()
-
-	fmt.Println("--------Task 3--------")
-	step := 0.01
-	iN := int(math.Round(1/step)) + 1
-	args := make([]float64, iN)
-	values := make([]opts.LineData, iN)
-	//values1 := make([]opts.LineData, iN)
-	//values2 := make([]opts.LineData, iN)
-	for i := range iN {
-		args[i] = round(step*float64(i), 6)
-		values[i] = opts.LineData{Value: math.Abs(uGrid[Nh/2][int(math.Round(float64(i)*step/tau))] - uAns(0.5, float64(i)*step))}
-		//values1[i] = opts.LineData{Value: uGrid[Nh/2][int(math.Round(float64(i)*step/tau))]}
-		//values2[i] = opts.LineData{Value: gridFunc(u, Nh/2, int(math.Round(float64(i)*step/tau)))}
+		fmt.Println("--------Task 3--------")
+		step := 0.01
+		iN := int(math.Round(1/step)) + 1
+		args := make([]float64, iN)
+		values := make([]opts.LineData, iN)
+		//values1 := make([]opts.LineData, iN)
+		//values2 := make([]opts.LineData, iN)
+		for i := range iN {
+			args[i] = round(step*float64(i), 6)
+			values[i] = opts.LineData{Value: math.Abs(uGrid[Nh/2][int(math.Round(float64(i)*step/tau))] - uAns(0.5, float64(i)*step))}
+			//values1[i] = opts.LineData{Value: uGrid[Nh/2][int(math.Round(float64(i)*step/tau))]}
+			//values2[i] = opts.LineData{Value: gridFunc(u, Nh/2, int(math.Round(float64(i)*step/tau)))}
+		}
+		chart := charts.NewLine()
+		chart.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: "Decision error"}))
+		chart.SetXAxis(args).AddSeries("deviation", values)
+		//chart.SetXAxis(args).AddSeries("uGrid", values1)
+		//chart.SetXAxis(args).AddSeries("uExact", values2)
+		file, _ := os.Create("task3.html")
+		defer file.Close()
+		chart.Render(file)
+		fmt.Println("Successful! Look at the file <task3.html>")
 	}
-	chart := charts.NewLine()
-	chart.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: "Decision error"}))
-	chart.SetXAxis(args).AddSeries("deviation", values)
-	//chart.SetXAxis(args).AddSeries("uGrid", values1)
-	//chart.SetXAxis(args).AddSeries("uExact", values2)
-	file, _ := os.Create("task3.html")
-	defer file.Close()
-	chart.Render(file)
-	fmt.Println("Successful! Look at the file <task3.html>")
 }
 
 func showMatrix(m [][]float64) {
