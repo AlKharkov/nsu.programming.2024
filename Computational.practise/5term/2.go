@@ -8,24 +8,36 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
+// tau/h	0.1			0.01		0.001		0.0001
+// 0.1		1.17e-01	1.17e-01	1.17e-01	1.17e-01
+// 0.01		3.55e-02	1.10e-02	1.10e-02	1.10e-02
+// 0.001	3.25e-02	1.09e-03	1.09e-03	1.09e-03
+// 0.0001	3.24e-02	3.56e-04	1.09e-04	1.09e-04
+
 func main() {
-	solve(0.1, 0.1, false)
-	solve(0.1, 0.01, false)
-	solve(0.1, 0.001, false)
-	solve(0.01, 0.1, false)
-	solve(0.01, 0.01, false)
-	solve(0.01, 0.001, false)
-	solve(0.001, 0.1, false)
-	solve(0.001, 0.01, false)
-	solve(0.001, 0.001, true)
+	p := 4
+	eps := createEps(p)
+	matrix := make([][]float64, p)
+	for i := range p {
+		matrix[i] = make([]float64, p)
+		for j := range p {
+			if i == p-1 && j == p-1 {
+				matrix[i][j] = solve(eps[i], eps[j], false)
+			} else {
+				matrix[i][j] = solve(eps[i], eps[j], false)
+			}
+		}
+	}
+	showEpsTable(&matrix)
 }
 
-func solve(h, tau float64, needPrint bool) {
+func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 	Nh, Nt := int(math.Round(1/h))+1, int(math.Round(1/tau))+1
 	// Input data
 	ux0 := func(x float64) float64 { return (x+0.1)*(x+0.1) + x }
@@ -43,8 +55,11 @@ func solve(h, tau float64, needPrint bool) {
 	}
 	for j := range Nt {
 		uGrid[0][j] = u0t(jToT(j))
-		uGrid[Nh-1][j] = u0t(methodNewton(alongCharacteristicLine(jToT(j))))
-		// fmt.Println(uGrid[Nh-1][j] - uAns(1, jToT(j)))  // Characteristic deviations
+	}
+	for j := range Nt - 1 {
+		c := (fToGrid(cxt, Nh-2, j+1) + fToGrid(cxt, Nh-2, j)) / 2
+		uGrid[Nh-2][j+1] = c*tau*(uGrid[Nh-2][j]-uGrid[Nh-1][j])/h + uGrid[Nh-2][j]     // explicit scheme
+		uGrid[Nh-1][j+1] = h*(uGrid[Nh-2][j]-uGrid[Nh-2][j+1])/tau/c + uGrid[Nh-2][j+1] // implicit scheme
 	}
 	// Start calculating ujk
 	var vector []float64
@@ -80,13 +95,12 @@ func solve(h, tau float64, needPrint bool) {
 		}
 	}
 	// Calculating maximum deviation between uGrid & u
-	var maximumDeviation float64
 	for j := range Nt {
 		for k := range Nh {
-			maximumDeviation = max(maximumDeviation, math.Abs(uGrid[k][j]-fToGrid(uAns, k, j)))
+			maxDeviation = max(maxDeviation, math.Abs(uGrid[k][j]-fToGrid(uAns, k, j)))
 		}
+		//maxDeviation = max(maxDeviation, math.Abs(uGrid[Nh-1][j]-fToGrid(uAns, Nh-1, j))) // for border
 	}
-	fmt.Printf("tau=%.0e, h=%.0e: %f / %.2e\n", round(tau, 6), round(h, 6), maximumDeviation, maximumDeviation)
 	if needPrint {
 		//fmt.Println("--------Task 2--------")
 		//showMatrix(uGrid)
@@ -116,6 +130,7 @@ func solve(h, tau float64, needPrint bool) {
 		chart.Render(file)
 		fmt.Println("Successful! Look at the file <task3.html>")
 	}
+	return
 }
 
 func showMatrix(m [][]float64) {
@@ -151,17 +166,29 @@ func runThroughMethod(a [][]float64, b []float64) (x []float64) {
 	return x
 }
 
-func alongCharacteristicLine(x float64) float64 {
-	return math.Sin(2*math.Pi*x) + 7*x - 4.4
+func createEps(n int) []float64 {
+	eps := make([]float64, n)
+	eps[0] = 0.1
+	for i := 1; i < n; i++ {
+		eps[i] = eps[i-1] / 10
+	}
+	return eps
 }
 
-// sin(2*pi*x) + 7*x - c = 0
-func methodNewton(c float64) (x float64) {
-	f := func(x float64) float64 { return math.Sin(2*math.Pi*x) + 7*x - c }
-	df := func(x float64) float64 { return 2*math.Pi*math.Cos(2*math.Pi*x) + 7 }
-	x = 0.5
-	for math.Abs(f(x)) > 0.000001 {
-		x -= f(x) / df(x)
+func showEpsTable(m *[][]float64) {
+	n := len(*m)
+	// eps := createEps(n)
+	fmt.Printf("tau/h")
+	fmt.Print("\t0.1")
+	for i := 1; i < n; i++ {
+		fmt.Print("\t\t0." + strings.Repeat("0", i) + "1")
 	}
-	return
+	fmt.Println()
+	for i := range n {
+		fmt.Print("0." + strings.Repeat("0", i) + "1")
+		for j := range n {
+			fmt.Printf("\t%.2e", (*m)[i][j])
+		}
+		fmt.Println()
+	}
 }
