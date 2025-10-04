@@ -2,31 +2,26 @@
 	Model of the Go language
 |#
 
-;; Lexical elements
-;comments
-(obj "line comment" :at "text" string)  ; // single-line comment
+;;; Lexical elements
+(obj "line comment" :at "text" string)     ; // single-line comment
 (obj "general comment" :at "text" string)  ; /* multi-line comment */
-;identifiers
-(obj "identifier" :union (string))  ; <doc> letter { letter | unicode_digit }
+(obj "identifier" :union (string))         ; a | _x9 | ThisVariableIsExported | αβ
 
 
-;; Constants
+;;; Constants
 (obj "constant" :union ("bool constant" int real "complex constant" string))
 (obj "bool constant" :enum ("true" "false"))
-(obj "complex constant" :union("complex number"))
-(obj "complex number" :at "re" real :at "im" real)
+(obj "complex constant" :at "re" real :at "im" real)
 
 
-;; Variables
+;;; Variables
 (obj "variable" :union ("identifier"))
 
 
-;; Types
+;;; Types
 (obj "type" :union ("base type" "composite type"))
-;base types
 (obj "base type" :union ("boolean type" "numeric type" "string type"))
 (obj "boolean type" :enum ("bool"))
-;numeric types
 (obj "numeric type" :union ("real-valued type" "complex type" "byte type" "rune type"))
 (obj "real-valued type" :enum ("int type" "float type"))
 (obj "int type" :union ("signed int type" "unsigned int type"))
@@ -35,160 +30,229 @@
 (obj "float type" :enum ("float32" "float64"))
 (obj "complex type" :enum ("complex32" "complex64"))
 (obj "byte type" :enum ("byte"))  ; <doc> alias for uint8
-(obj "rune type" :enum ("rune"))  ; <doc> alias for int32
-;string types
+(obj "rune type" :enum ("rune"))  ; 'a' | 'ä' | '本' | '\t' | '\377' | '\U00101234'
 (obj "string type" :enum ("string"))
-;composite types
+;;composite types
 (obj "composite type" :union ("array type" "slice type" "struct type" "pointer type" "function type" "interface type" "map type" "channel type"))
-(obj "array type" :at "len" nat :at "element type" "type")
-(obj "slice type" :at "underlying array" "array type")  ; for decl :at "element type" "type" :at "start index" "nat" :at "len" nat :at "cap" nat
+(obj "array type" :at "len" nat :at "element type" "type")  ; [32]byte | [2][2][2]float64 ~ same as [2]([2]([2]float64))
+(obj "slice type" :at "underlying array" "array type")
+; a := [5]int{1, 2, 3, 4, 5}    // a = [1, 2, 3, 4, 5] - underlying array
+; s := a[1:4]                   // s = [2, 3, 4] - slice
 (obj "struct type" :at "fields" (listt "field decl"))
 (obj "field decl" :union ("named field" "embedded field"))
 (obj "named field" :at "name" "identifier" :at "type" "type")
 (obj "embedded field" :at "type" "type")
+; struct {
+; 	x, y int    // named field 
+; 	A *[]int
+;   T           // embedded field
+; }
 (obj "pointer type" :at "type" "type")
-;function types
+;;function types
 (obj "function type" :at "signature" "signature")
-(obj "signature" :at "parameters" "parameters" :at "result" "result")
+(obj "signature" :at "parameters" "parameters" :at "result" "function result")
 (obj "parameters" :union((listt "parameter decl")))
-(obj "paramater decl" :at "identifier" "identifier" :at "type" :at "type")
-(obj "result" :union ("parameters" "type"))
-;interface types
+(obj "paramater decl" :at "name" "identifier" :at "type" "type | variadic type")
+(obj "type | variadic type" :union ("type" "variadic type"))
+(obj "variadic type" :at "type" "type")  ; func f(numbers ...int) -> f(1, 2, 3, 4)
+(obj "function result" :union ("parameters" "type"))
+; func("parameters") "result"
+; func(a, b int, z float32) bool
+; func(int, int, float64) (bool, int) ~ same as func(_, _ int, _ float64) (bool, int)
+; func(n int) func(p *T)
+;;interface types
 (obj "interface type" :at "elements" (listt "interface elem"))
-(obj "interface eleme" :union ("method elem" "type elem"))
+(obj "interface elem" :union ("method elem" "type elem"))
 (obj "type elem" :union ((listt "type term")))
 (obj "method elem" :at "name" "identifier" :at "signature" "signature")
 (obj "type term" :union ("type" "underlying type"))
+; type A interface {
+;   f(n int) (q bool)     // method elem: "name" = `f`, "signature" = `(n int) (q bool)`
+; }
+; type B interface {
+;   A                     // type elem: includes methods of A in B's method set
+;   g(p *int) (a int[]) 
+; }
+; interface {             // An interface representing all types with underlying type int that implement the String method.
+; 	~int
+; 	String() string
+; }
 (obj "underlying type" :at "type" "type")  ; ~Type
-;map types
-(obj "map type" :at "key type" :at "element type" "type")
-;channel types
+; type (    
+;   // the underlying type of string, A1 and A2 is string
+; 	A1 = string
+; 	A2 = A1
+;
+;   // the underlying type of B1 and B2 is string; the underlying type of []B1, B3 and B4 is []B1
+; 	B1 string
+; 	B2 B1
+; 	B3 []B1
+; 	B4 B3
+; )
+(obj "map type" :at "key type" "type" :at "element type" "type")  ; map[*T]struct{ x, y float64 }
 (obj "channel type" :at "chan" :at "type" "type" :at "direction" "direction")
-(obj "direction" :enum ("send" "recieve" "bidirectional"))
-(obj "send")  ; chan<- Type
-(obj "receive")  ; <-chan Type
-(obj "bidirectional")  ; chan Type
+(obj "direction" :enum ("send" "receive" "bidirectional"))
+; chan T            // can be used to send and receive values of type T
+; chan<- float64    // can only be used to send float64s
+; <-chan int        // can only be used to receive ints
 
 
-;; Blocks
-(obj "block" :union ("statement list"))
-(obj "statement list" :union ((listt "statement")))
+;;; Blocks
+(obj "block" :at "statements" (listt "statement"))  ; { "statement" ... "statement" }
 
 
-;; Declarations
+;;; Declarations
 (obj "declaration" :union ("const decl" "type decl" "var decl"))
 (obj "top level decl" :union ("declaration" "function decl" "method decl"))
-;const decl
-(obj "const decl" :union((listt "const spec")))
-(obj "const spec" :at "id list" "id list" :at "type" "type" :at "expr list" "expr list")
-(obj "id list" :union ((listt "identifier")))
+;;const decl
+(obj "const decl" :at "specs" (listt "const spec"))
+(obj "const spec" :at "names" "identifier list" :at "type" "type" :at "initializers" "expr list")
+; const (
+; 	size int64 = 1024
+; 	eof        = -1       // untyped integer constant
+; )
+(obj "identifier list" :union ((listt "identifier")))
 (obj "expr list" :union ((listt "expression")))
-;type decl
-(obj "type decl" :union ((listt "type spec")))
-(obj "type spec" :union ("alias decl" "type def"))
-(obj "alias decl" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "type" "type")
-(obj "type parameters" :union ("type param list"))
-(obj "type param list" :union ((listt "type param decl")))
-(obj "type param decl" :at "id list" "id list" :at "type constraint" "type constraint")
-(obj "type constraint" :union ("type elem"))
+;;type decl
+(obj "type decl" :union ((listt "alias decl | type def")))
+(obj "alias decl | type def" :union ("alias decl" "type def"))
+(obj "alias decl" :at "name" "identifier" :at "type parameters" "type parameters" :at "type" "type")
+; type (
+; 	nodeList = []*Node    // nodeList and []*Node are identical types
+; 	Polar    = polar      // Polar and polar denote identical types
+; )
+; type set[P comparable] = map[P]bool
+(obj "type parameters" :at "param declarations" (listt "type param decl"))
+(obj "type param decl" :at "identifier list" "identifier list" :at "type constraint" "type constraint")
+(obj "type constraint" :at "constraints" "type elem")  ; [T1 comparable, T2 any]
 (obj "type def" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "type" "type")
-;var decl
-(obj "var decl" :union ((listt "var spec")))
-(obj "var spec" :at "id list" "id list" :at "type" "type" :at "expr list" "expr list")
-(obj "short var decl" :at "id list" "id list" :at "expr list" "expr list")
-;function decl
+; type (
+; 	Point struct{ x, y float64 }    // Point and struct{ x, y float64 } are different types
+; 	polar Point                     // polar and Point denote different types
+; )
+;;var decl
+(obj "var decl" :at "specifiers" (listt "var spec"))
+(obj "var spec" :at "identifier list" "identifier list" :at "type" "type" :at "expr list" "expr list")
+; var U, V, W float64
+; var k = 0
+; var x, y float32 = -1, -2
+(obj "short var decl" :at "identifier list" "identifier list" :at "expr list" "expr list")
+; f := func() int { return 7 }
+;;function decl
 (obj "function decl" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "signature" "signature" :at "body" "function body")
-(obj "function body" :union("block"))
-;method decl
+(obj "function body" :at "block" "block")
+; func min[T ~int|~float64](x, y T) T {
+; 	if x < y {
+; 		return x
+; 	}
+; 	return y
+; }
+;;method decl
 (obj "method decl" :at "reciever" "parameters" :at "name" "identifier" :at "signature" "signature" :at "body" "function body")
+; func (p *Point) Scale(factor float64) {
+; 	p.x *= factor
+; 	p.y *= factor
+; }
 
 
-;; Expressions
-;operands
-(obj "operand" :union ("literal"))
+;;; Expressions
+;;operands
+(obj "operand" :union ("literal" "parenthesized expression"))
 (obj "literal" :union ("basic literal" "composite literal" "function literal"))
 (obj "basic literal" :union("constant"))
-(obj "composite literal" :at "type" "literal type" :at "value" "literal value")
+(obj "composite literal" :at "type" "literal type" :at "value" (listt "keyed element"))
 (obj "literal type" :union ("struct type" "array type" "*array type" "slice type" "map type" "short arr type"))
-(obj "*array type" :at "type" "type")  ; ... ElementType
-(obj "short arr type" :at "type name" "type name" :at "type args" (listt "type"))
-(obj "type name" :union ("identifier" "qualified identifier"))
-(obj "operand name" :union ("identifier" "qualified identifier"))
-(obj "qualified identifier" :at "package name" "identifier" :at "identifier" "identifier")  ; <PackageName>.<identifier>
-(obj "literal value" :union((listt "keyed element")))
+(obj "... type" :at "type" "type")  ; ... ElementType
+(obj "short arr type" :at "name" "identifier | qualified identifier" :at "type args" (listt "type"))
+(obj "identifier | qualified identifier" :union ("identifier" "qualified identifier"))
+(obj "qualified identifier" :at "package name" "identifier" :at "identifier" "identifier")  ; math.Sin
 (obj "keyed element" :at "key" "key" :at "element" "element")
-(obj "key" :union ("field name" "expression" "literal value"))
-(obj "element" :union ("expression" "literal value"))
-(obj "function literal" :at "signature" "signature" :at "body" "block")  ; function literals alias for anonymous functions
-;primary expressions
-(obj "primary expression" :union ("operand" "conversion" "method expr" "primary expr & selector" "primary expr & index" "primary expr & slice" "primary expr & type assertion" "primary expr & argument"))
-(obj "conversion" :at "type" "type" :at "expression" "expression")  ; (*Point)(p) - p is converted to *Point
+(obj "key" :union ("field name" "expression" (listt "keyed element")))
+(obj "element" :union ("expression" (listt "keyed element")))
+(obj "function literal" :at "signature" "signature" :at "body" "block")  ; func(a, b int, z float64) bool { return a*b < int(z) }
+(obj "parenthesized expression" :at "expression" "expression")
+; import (
+;   "fmt"
+;   "math"
+; )
+;;primary expressions
+(obj "primary expression" :union ("operand" "conversion" "method expr" "primary expr & selector" "primary expr & index expr" "primary expr & slice expr" "primary expr & type assertion" "primary expr & argument"))
+(obj "conversion" :at "type" "type" :at "expression" "expression")  ; (*Point)(p)    // p is converted to *Point
 (obj "method expression" :at "receiver type" "type" :at "name" "identifier")
+; type T struct {
+; 	a int
+; }
+; func (tv T) Mv(b int) int { return tv.a + b }    // value receiver
 (obj "primary expr & selector" :at "primary expr" "primary expression" :at "selector" "selector")
-(obj "selector" :union ("identifier"))  ; x.id
-(obj "primary expr & index" :at "primary expr" "primary expression" :at "index" "index")
-(obj "index" :union ("expression"))  ; x[e]
-(obj "primary expr & slice" :at "primary expr" "primary expression" :at "slice" "slice")
-(obj "slice" :at "low" "expression" :at "high" "expression" :at "max" "expression")  ; x[e1 : e2] | x[e1 : e2 : e3]
+(obj "selector" :at "name" "identifier")  ; x.id
+(obj "primary expr & index expr" :at "primary expr" "primary expression" :at "index" "index")
+(obj "index expr" :at "expression" "expression")  ; x[e]
+(obj "primary expr & slice expr" :at "primary expr" "primary expression" :at "slice" "slice")
+(obj "slice expr" :at "low" "expression" :at "high" "expression" :at "max" "expression")  ; x[e1 : e2] | x[e1 : e2 : e3]
 (obj "primary expr & type assertion" :at "primary expr" "primary expression" :at "type assertion" "type assertion")
 (obj "type assertion" :at "type" "type")  ; .(Type)
-(obj "primary expr & arguments" :at "primary expr" "primary expression" :at "arguments" "arguments")
-(obj "arguments" :union ((listt "expression")))
-;expressions
+; var x interface{} = 7    // x has dynamic type int and value 7
+; i := x.(int)             // i has type int and value 7
+(obj "primary expr & arguments" :at "primary expr" "primary expression" :at "arguments" (listt "expression"))
+;;expressions
 (obj "expression" :union ("unary expression" "e1 & binary operator & e2"))
 (obj "e1 & binary operator & e2" :at "arg1" "expression" :at "binary operator" "binary operator" :at "arg2" "expression")
 (obj "unary expression" :union ("primary expression" "unary operator & unary expression"))
 (obj "unary operator & unary expression" :at "operator" "unary operator" :at "expression" "unary expression")
-;operators
-;unary operators
+;;operators
+;;unary operators
 (obj "unary operator" :union ("+x" "-x" "^x" "!b" "*p" "&x" "<-"))
-(obj "+x" :at "x" "expression") ; +x == 5
-(obj "-x" :at "x" "expression") ; -x == -1 * x
-(obj "^x" :at "x" "expression") ; ^10(2) == 01(2)
-(obj "!b" :at "b" "expression") ; !true == false
-(obj "*p" :at "p" "expression")  ; *p
+(obj "+x" :at "x" "expression")  ; +x == 5
+(obj "-x" :at "x" "expression")  ; -x == -1 * x
+(obj "^x" :at "x" "expression")  ; ^10(2) == 01(2)
+(obj "!b" :at "b" "expression")  ; !true == false
+(obj "*x" :at "x" "expression")  ; *x
 (obj "&x" :at "x" "expression")  ; &x
 (obj "<-" :at "channel" "channel type")
-;binary operators
+;;binary operators
 (obj "binary operator" :union ("||" "&&" "rel operator" "add operator" "mul operator"))
 (obj "||" :at "arg1" "expression" :at "arg2" "expression")  ; true || false == false
 (obj "&&" :at "arg1" "expression" :at "arg2" "expression")  ; true && false == false
-;binary multiplication operators
+;;binary multiplication operators
 (obj "mul operator" :union ("x*y" "x/y" "x%y" "x<<y" "x>>y" "x&y" "x&^y"))
-(obj "x*y" :at "x" "expression" :at "y" "expression") ; 5 * 10 == 50
-(obj "x/y" :at "x" "expression" :at "y" "expression") ; 4 / 2 = 2.0
-(obj "x%y" :at "x" "expression" :at "y" "expression") ; 5 % 2 == 1
+(obj "x*y" :at "x" "expression" :at "y" "expression")  ; 5 * 10 == 50
+(obj "x/y" :at "x" "expression" :at "y" "expression")  ; 4 / 2 = 2.0
+(obj "x%y" :at "x" "expression" :at "y" "expression")  ; 5 % 2 == 1
 (obj "x<<y" :at "x" "expression" :at "y" "expression") ; 1 << 12 == 2 ** 12
 (obj "x>>y" :at "x" "expression" :at "y" "expression") ; 32 >> 2 == 2 ** 3
-(obj "x&y" :at "x" "expression" :at "y" "expression") ; 1100(2) & 1010(2) == 1000(2)
-(obj "x&^y" :at "x" "expression" :at "y" "expression") ; 11001010(2) &^ 10101100(2) == 01000010(2) ; 1 <=> 1 &^ 0
-;binary addition operators
+(obj "x&y" :at "x" "expression" :at "y" "expression")  ; 1100(2) & 1010(2) == 1000(2)
+(obj "x&^y" :at "x" "expression" :at "y" "expression") ; 11001010(2) &^ 10101100(2) == 01000010(2)    // 1 <=> 1 &^ 0
+;;binary addition operators
 (obj "add operator" :union ("x+y" "x-y" "x|y" "x^y"))
-(obj "x+y" :at "x" "expression" :at "y" "expression") ; 2 + 3 == 5
-(obj "x-y" :at "x" "expression" :at "y" "expression") ; 2 - 3 == -1
-(obj "x|y" :at "x" "expression" :at "y" "expression") ; 1100(2) | 1010(2) == 1110(2)
-(obj "x^y" :at "x" "expression" :at "y" "expression") ; 1100(2) ^ 1010(2) == 0110(2)
-;relation operators
+(obj "x+y" :at "x" "expression" :at "y" "expression")  ; 2 + 3 == 5
+(obj "x-y" :at "x" "expression" :at "y" "expression")  ; 2 - 3 == -1
+(obj "x|y" :at "x" "expression" :at "y" "expression")  ; 1100(2) | 1010(2) == 1110(2)
+(obj "x^y" :at "x" "expression" :at "y" "expression")  ; 1100(2) ^ 1010(2) == 0110(2)
+;;relation operators
 (obj "rel operator" :union ("x==y" "x!=y" "unequality operator"))
 (obj "x==y" :at "x" "expression" :at "y" "expression")  ; x == 3 | 4 == 5 | x == y
 (obj "x!=y" :at "x" "expression" :at "y" "expression")  ; x != 5
 (obj "unequality operator" :union ("x<y" "x<=y" "x>y" "x>=y"))
-(obj "x<y" :at "x" "expression" :at "y" "expression")  ; x < 3 | 3 < 5 | x < y
+(obj "x<y" :at "x" "expression" :at "y" "expression")   ; x < 3 | 3 < 5 | x < y
 (obj "x<=y" :at "x" "expression" :at "y" "expression")  ; x <= 3 | 3 <= 4 | x <= y
-(obj "x>y" :at "x" "expression" :at "y" "expression")  ; x > 3 | 4 > 5 | x > y
+(obj "x>y" :at "x" "expression" :at "y" "expression")   ; x > 3 | 4 > 5 | x > y
 (obj "x>=y" :at "x" "expression" :at "y" "expression")  ; x >= 3 | 3 >= 4 | x >= y
 
-;; Statements
+;;; Statements
 (obj "statement" :union ("declaration" "label stmt" "simple stmt" "go stmt" "return stmt" "break stmt" "continue stmt" "goto stmt" "fallthrough stmt" "block" "if stmt" "switch stmt" "select stmt" "for stmt" "defer stmt"))
 (obj "simple statement" :union ("empty stmt" "expression stmt" "send stmt" "x++ stmt | x-- stmt" "assignment" "short var decl"))
 (obj "empty stmt")  ; <doc> The empty statement does nothing
-(obj "label stmt" :at "label" "label" :at "statement" "statement")  ; <example> Error: log.Panic("error encountered") ???
-(obj "label" :union ("identifier"))
+(obj "label stmt" :at "label" "label" :at "statement" "statement")
+(obj "label" :at "name" "identifier")
+; "label": "statement"
+;   Error: log.Panic("error encountered")
 (obj "expression stmt" :union ("expression"))
+; h(x+y)
+; f.Close()
 (obj "send stmt" :at "channel" "expression" :at "message" "expression")
 (obj "x++ stmt | x-- stmt" :union ("x++ stmt" "x-- stmt"))
-(obj "x++ stmt" :at "x" "expression")
-(obj "x-- stmt" :at "x" "expression")
+(obj "x++ stmt" :at "x" "expression")  ; x += 1
+(obj "x-- stmt" :at "x" "expression")  ; x -= 1
 (obj "assignment" :at "location" (listt "expression") :at "operator" "assignment operators" :at "expression" (listt "expression"))
 (obj "assignment operators" :union ("x=y" "x+=y" "x-=y" "x|=y" "x^=y" "x*=y" "x/=y" "x%=y" "x<<=y" "x>>=y" "x&=y" "x&^=y"))
 (obj "x=y" :at "x" "expression" :at "y" "expression")
@@ -205,49 +269,102 @@
 (obj "x&^=y" :at "x" "expression" :at "y" "expression")
 (obj "if stmt" :at "init" "simple stmt" :at "expression" "expression" :at "block" "block" :at "else" "if stmt | block")
 (obj "if stmt | block" :union ("if statement" "block"))
+; if x := f(); x < y {
+; 	return x
+; } else if x > z {
+; 	return z
+; }
 (obj "switch stmt" :union ("expr switch stmt" "type switch stmt"))
 (obj "expr switch stmt" :at "stmt" "simple stmt" :at "expression" "expression" :at "expr case clause")
-(obj "expr case clause" :at "case" "expr switch case" :at "stmt" (listt "statement"))
-(obj "expr switch case" :union ((listt "expression")))
+(obj "expr case clause" :at "case" (listt "expression") :at "stmt" (listt "statement"))
+; switch tag {
+; case 0, 1, 2, 3: s1()
+; case 4, 5, 6, 7: s2()
+; default: s3()
+; }
 (obj "type switch stmt" :at "stmt" "simple stmt" :at "type switch guard" "type switch guard" :at "type case clause" "type case clause")
 (obj "type switch guard" :at "identifier" "identifier" :at "expression" "primary expression")
-(obj "type case clause" :at "case" "type switch case" :at "stmt" (listt "statement"))
-(obj "type switch case" :union ((listt "type")))
+(obj "type case clause" :at "case" (listt "type") :at "stmt" (listt "statement"))
+; switch t := x.(type) {              // type checker
+; case nil:
+; 	fmt.Println("x is nil")  
+; default:
+;   fmt.Println("don't know the type")
 (obj "for stmt" :at "variety" "condition | for clause | range clause" :at "block" "block")
-(obj "condition | for clause | range clause" :union ("condition" "for clause" "range clause"))
-(obj "condition" :union(("expression")))
-(obj "for clause" :at "init" "simple stmt" :at "condition" "condition" :at "post" "simple stmt")
-(obj "range clause" :at "location" "expr list | id list" :at "expression" "expression")
-(obj "expr list | id list" :union ("expr list" "id list"))
-(obj "go stmt" :union (("expression")))
-(obj "select stmt" :union("common slause"))
-(obj "common clause" :at "case" "common case" :at "stmt list" "stmt list")
+(obj "condition | for clause | range clause" :union ("expression" "for clause" "range clause"))
+(obj "for clause" :at "init" "simple stmt" :at "condition" "expression" :at "post" "simple stmt")
+(obj "range clause" :at "location" "expr list | identifier list" :at "expression" "expression")
+(obj "expr list | identifier list" :union ("expr list" "identifier list"))
+; for a < b { a *= 2 }                // the usual while loop
+; for i := 0; i < 10; i++ { f(i) }    // the usual for loop
+; a := [5]int{1, 2, 3, 4, 5}
+; for i, v := range a {
+;   fmt.Println(i, v)                 // i a[i]
+; }
+(obj "go stmt" :at "expression" "expression")  ; <doc> It starts the execution of a function call as an independent concurrent thread of control
+; go Server()
+; go func(ch chan<- bool) { for { sleep(10); ch <- true }} (c)
+(obj "select stmt" :at "statement" "common slause")
+(obj "common clause" :at "case" "common case" :at "stmt list" (listt "statement"))
 (obj "common case" :union ("send stmt" "recv stmt"))
-(obj "recv stmt" :at "list" "expr list | id list" :at "expression" "expression")
-(obj "expr list | id list" :union ("expr list" "id list"))
-(obj "stmt list" :union ((listt "statement")))
+(obj "recv stmt" :at "list" "expr list | identifier list" :at "expression" "expression")
+(obj "expr list | identifier list" :union ("expr list" "identifier list"))
+; go func(c1 chan int) {
+; 	a := <-c1
+; 	c1 <- 20 * a
+; }
+; go func(c2 chan int) {
+; 	b := <-c2
+; 	c2 <- 100 * b
+; }
+; c1, c2 := make(chan int), make(chan int)
+; c1 <- 2
+; c2 <- 3
+; select {
+; case a := <-c1:
+;   fmt.Println(1, a)
+; case b := <-c2:
+;   fmt.Println(2, b)
+; }
 (obj "return stmt" :at "expr list" "expr list")
 (obj "break stmt" :at "label" "label")
+; OuterLoop:
+;   for {
+;     for {
+;       break OuterLoop
+;     }
+;   }
 (obj "continue stmt" :at "label" "label")
 (obj "goto stmt" :at "label" "label")
-(obj "fallthrough stmt")  ; A "fallthrough" statement transfers control to the next case clause in a switch
-(obj "defer stmt" :at "expression" "expression")
+(obj "fallthrough stmt")
+; switch {                     // prints "true & false"
+;   case true:
+;     fmt.Print("true & ")
+;     fallthrough              // It transfers control to the next case clause in a switch
+;   case false:
+;     fmt.Print("false")
+; }
+(obj "defer stmt" :at "expression" "expression")  ; A "defer" statement invokes a function whose execution is deferred to the moment the surrounding function returns
+; for i := 0; i <= 3; i++ {    // prints 3 2 1 0
+; 	defer fmt.Print(i)
+; }
 
 
-;; Source file organization
+;;; Source file organization
 (obj "source file" :at "package clause" "package clause" :at "import decl" "import decl" :at "top level decl" "top level decl")
-;package clause
+;;package clause
 (obj "package clause" :union ("package name"))  ; package math
 (obj "package name" :union ("identifier"))
-;import declaration
+;;import declaration
 (obj "import decl" :at "import spec list" (listt "import spec"))
 (obj "import spec" :at "name" "package name" :at "import path" "import path")
 (obj "import path" :union(string))  ; import m "lib/math"
 
 
-;; For the future
+;;; For the future
 #|
 (obj "variable declaration" :at "name" "identifier" :at "type" "type" :at "value" "expression")  ; Need to check: (is-instance (aget variable "value") (aget variable "type"))
 (obj "array" :at "type" "array type" :at "value" (listt any))
 (obj "slice" :at "type" "slice type" :at "start index" nat :at "length" nat :at "capacity" nat)
+for slice decl :at "element type" "type" :at "start index" "nat" :at "len" nat :at "cap" nat
 |#
