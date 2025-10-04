@@ -104,7 +104,7 @@
 ;;; Declarations
 (obj "declaration" :union ("const decl" "type decl" "var decl"))
 (obj "top level decl" :union ("declaration" "function decl" "method decl"))
-;;const decl
+;;const declarations
 (obj "const decl" :at "specs" (listt "const spec"))
 (obj "const spec" :at "names" "identifier list" :at "type" "type" :at "initializers" "expr list")
 ; const (
@@ -113,7 +113,7 @@
 ; )
 (obj "identifier list" :union ((listt "identifier")))
 (obj "expr list" :union ((listt "expression")))
-;;type decl
+;;type declarations
 (obj "type decl" :union ((listt "alias decl | type def")))
 (obj "alias decl | type def" :union ("alias decl" "type def"))
 (obj "alias decl" :at "name" "identifier" :at "type parameters" "type parameters" :at "type" "type")
@@ -130,7 +130,7 @@
 ; 	Point struct{ x, y float64 }    // Point and struct{ x, y float64 } are different types
 ; 	polar Point                     // polar and Point denote different types
 ; )
-;;var decl
+;;var declarations
 (obj "var decl" :at "specifiers" (listt "var spec"))
 (obj "var spec" :at "identifier list" "identifier list" :at "type" "type" :at "expr list" "expr list")
 ; var U, V, W float64
@@ -138,7 +138,7 @@
 ; var x, y float32 = -1, -2
 (obj "short var decl" :at "identifier list" "identifier list" :at "expr list" "expr list")
 ; f := func() int { return 7 }
-;;function decl
+;;function declarations
 (obj "function decl" :at "identifier" "identifier" :at "type parameters" "type parameters" :at "signature" "signature" :at "body" "function body")
 (obj "function body" :at "block" "block")
 ; func min[T ~int|~float64](x, y T) T {
@@ -147,7 +147,7 @@
 ; 	}
 ; 	return y
 ; }
-;;method decl
+;;method declarations
 (obj "method decl" :at "reciever" "parameters" :at "name" "identifier" :at "signature" "signature" :at "body" "function body")
 ; func (p *Point) Scale(factor float64) {
 ; 	p.x *= factor
@@ -240,7 +240,7 @@
 
 ;;; Statements
 (obj "statement" :union ("declaration" "label stmt" "simple stmt" "go stmt" "return stmt" "break stmt" "continue stmt" "goto stmt" "fallthrough stmt" "block" "if stmt" "switch stmt" "select stmt" "for stmt" "defer stmt"))
-(obj "simple statement" :union ("empty stmt" "expression stmt" "send stmt" "x++ stmt | x-- stmt" "assignment" "short var decl"))
+(obj "simple statement" :union ("empty stmt" "expression stmt" "send stmt" "x++ stmt | x-- stmt" "assignment stmt" "short var decl"))
 (obj "empty stmt")  ; <doc> The empty statement does nothing
 (obj "label stmt" :at "label" "label" :at "statement" "statement")
 (obj "label" :at "name" "identifier")
@@ -253,7 +253,8 @@
 (obj "x++ stmt | x-- stmt" :union ("x++ stmt" "x-- stmt"))
 (obj "x++ stmt" :at "x" "expression")  ; x += 1
 (obj "x-- stmt" :at "x" "expression")  ; x -= 1
-(obj "assignment" :at "location" (listt "expression") :at "operator" "assignment operators" :at "expression" (listt "expression"))
+;;assignment statements
+(obj "assignment stmt" :at "location" (listt "expression") :at "operator" "assignment operators" :at "expression" (listt "expression"))
 (obj "assignment operators" :union ("x=y" "x+=y" "x-=y" "x|=y" "x^=y" "x*=y" "x/=y" "x%=y" "x<<=y" "x>>=y" "x&=y" "x&^=y"))
 (obj "x=y" :at "x" "expression" :at "y" "expression")
 (obj "x+=y" :at "x" "expression" :at "y" "expression")
@@ -267,6 +268,7 @@
 (obj "x>>=y" :at "x" "expression" :at "y" "expression")
 (obj "x&=y" :at "x" "expression" :at "y" "expression")
 (obj "x&^=y" :at "x" "expression" :at "y" "expression")
+;;if statement
 (obj "if stmt" :at "init" "simple stmt" :at "expression" "expression" :at "block" "block" :at "else" "if stmt | block")
 (obj "if stmt | block" :union ("if statement" "block"))
 ; if x := f(); x < y {
