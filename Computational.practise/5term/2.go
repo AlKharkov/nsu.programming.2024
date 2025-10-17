@@ -14,14 +14,34 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
+// Через характеристики
 // tau/h	0.1			0.01		0.001		0.0001
 // 0.1		1.17e-01	1.17e-01	1.17e-01	1.17e-01
 // 0.01		3.55e-02	1.10e-02	1.10e-02	1.10e-02
 // 0.001	3.25e-02	1.09e-03	1.09e-03	1.09e-03
 // 0.0001	3.24e-02	3.56e-04	1.09e-04	1.09e-04
 
+// Точное
+// tau/h	0.1			0.01		0.001
+// 0.1		4.28e-02	4.56e-04	4.56e-06
+// 0.01		5.04e-02	4.77e-04	4.76e-06
+// 0.001	5.06e-02	4.77e-04	4.77e-06
+
+// Явная схема
+// tau/h	0.1			0.01		0.001		0.0001
+// 0.1		5.36e-02	6.75e-03	5.32e-03	5.54e-03
+// 0.01		9.05e+06	9.24e-04	1.13e-04	6.23e-05
+// 0.001	4.01e+17	3.05e+94	4.01e-04	1.22e-06
+// 0.0001	5.15e+26	8.25e+210	NaN			7.71e+17
+
+// Центральная явная + дополнительная
+// tau/h	0.1			0.01		0.001
+// 0.1		8.43e-02	7.09e-03	7.60e-04
+// 0.01		4.93e+01	1.03e-03	1.18e-04
+// 0.001	6.79e+04	7.52e+38	8.33e-06
+
 func main() {
-	p := 4
+	p := 3
 	eps := createEps(p)
 	matrix := make([][]float64, p)
 	for i := range p {
@@ -46,7 +66,7 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 	uAns := func(x, t float64) float64 { return (x+0.1)*(x+0.1) - math.Sin(2*math.Pi*t)/2 + x - 3.5*t }
 	kToX := func(k int) float64 { return float64(k) * h }
 	jToT := func(j int) float64 { return float64(j) * tau }
-	fToGrid := func(fn func(float64, float64) float64, k, j int) float64 { return fn(kToX(k), jToT(j)) }
+	toGrid := func(fn func(float64, float64) float64, k, j int) float64 { return fn(kToX(k), jToT(j)) }
 	// Start solution
 	uGrid := make([][]float64, Nh)
 	for k := range Nh {
@@ -56,11 +76,6 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 	for j := range Nt {
 		uGrid[0][j] = u0t(jToT(j))
 	}
-	for j := range Nt - 1 {
-		c := (fToGrid(cxt, Nh-2, j+1) + fToGrid(cxt, Nh-2, j)) / 2
-		uGrid[Nh-2][j+1] = c*tau*(uGrid[Nh-2][j]-uGrid[Nh-1][j])/h + uGrid[Nh-2][j]     // explicit scheme
-		uGrid[Nh-1][j+1] = h*(uGrid[Nh-2][j]-uGrid[Nh-2][j+1])/tau/c + uGrid[Nh-2][j+1] // implicit scheme
-	}
 	// Start calculating ujk
 	var vector []float64
 	matrix := make([][]float64, Nh-2)
@@ -69,20 +84,30 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 			matrix[i] = make([]float64, Nh-2)
 		}
 		vector = make([]float64, Nh-2)
+		//k := Nh - 1
+		//c := (toGrid(cxt, k, j+1) + 2*toGrid(cxt, k, j) + toGrid(cxt, k-1, j)) / 4
+		//uGrid[k][j+1] = tau*c*uGrid[k-1][j]/h + (h-tau*c)*uGrid[k][j]/h
+		//uGrid[Nh-1][j+1] = toGrid(uAns, Nh-1, j+1)
+		k := Nh - 2
+		uGrid[k][j+1] = tau*toGrid(cxt, k, j)*(uGrid[k-1][j]-uGrid[k+1][j])/2/h + uGrid[k][j]
+		k += 1
+		c := cxt((float64(k)-0.5)*h, (float64(j)+0.5)*tau)
+		c1, c2 := h/(h+tau*c), tau*c/(h+tau*c)
+		uGrid[k][j+1] = (uGrid[k][j]-uGrid[k-1][j+1])*(c1-c2) + uGrid[k-1][j]*(c1+c2)
 		for k := 1; k < Nh-1; k++ {
 			switch k {
 			case 1:
-				p := tau * (fToGrid(cxt, k, j) + fToGrid(cxt, k, j+1)) / 8 / h
+				p := tau * (toGrid(cxt, k, j) + toGrid(cxt, k, j+1)) / 8 / h
 				vector[0] = uGrid[k][j] + p*(uGrid[k-1][j+1]+uGrid[k-1][j]-uGrid[k+1][j])
 				matrix[0][0] = 1
 				matrix[0][1] = p
 			case Nh - 2:
-				p := 8 * h / tau / (fToGrid(cxt, k, j) + fToGrid(cxt, k, j+1))
+				p := 8 * h / tau / (toGrid(cxt, k, j) + toGrid(cxt, k, j+1))
 				vector[k-1] = uGrid[k+1][j+1] - uGrid[k-1][j] + uGrid[k+1][j] - p*uGrid[k][j]
 				matrix[k-1][k-2] = 1
 				matrix[k-1][k-1] = -p
 			default:
-				p := 8 * h / tau / (fToGrid(cxt, k, j) + fToGrid(cxt, k, j+1))
+				p := 8 * h / tau / (toGrid(cxt, k, j) + toGrid(cxt, k, j+1))
 				vector[k-1] = uGrid[k+1][j] - uGrid[k-1][j] - p*uGrid[k][j]
 				matrix[k-1][k-2] = 1
 				matrix[k-1][k-1] = -p
@@ -97,7 +122,7 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 	// Calculating maximum deviation between uGrid & u
 	for j := range Nt {
 		for k := range Nh {
-			maxDeviation = max(maxDeviation, math.Abs(uGrid[k][j]-fToGrid(uAns, k, j)))
+			maxDeviation = max(maxDeviation, math.Abs(uGrid[k][j]-toGrid(uAns, k, j)))
 		}
 		//maxDeviation = max(maxDeviation, math.Abs(uGrid[Nh-1][j]-fToGrid(uAns, Nh-1, j))) // for border
 	}
@@ -134,7 +159,8 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 }
 
 func showMatrix(m [][]float64) {
-	for _, v := range m {
+	for i := range m {
+		v := m[len(m)-i-1]
 		for _, u := range v {
 			if u != 0 {
 				fmt.Printf("%.0e\t", u)
@@ -144,6 +170,7 @@ func showMatrix(m [][]float64) {
 		}
 		fmt.Println()
 	}
+	fmt.Println()
 }
 
 func round(x float64, n int) float64 {
