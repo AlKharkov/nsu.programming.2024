@@ -14,23 +14,23 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
-// tau/h	0.1			0.01		0.001		0.0001
+// h\tau	0.1			0.01		0.001		0.0001
 // 0.1		9.97e-02	9.75e-03	7.67e-04	1.32e-04
 // 0.01		2.87e+11	3.82e+50	9.97e-04	9.76e-05
 // 0.001	3.64e+29	5.49e+258	NaN			NaN
 // 0.0001	3.65e+47	NaN			NaN			NaN
 
 func main() {
-	p := 4
+	p := 3
 	eps := createEps(p)
 	matrix := make([][]float64, p)
 	for i := range p {
 		matrix[i] = make([]float64, p)
 		for j := range p {
-			if i == p-1 && j == p-1 {
-				matrix[i][j] = solve(eps[i], eps[j], true) // true/false
+			if i == 1 && j == 0 {
+				matrix[i][j] = solve(eps[j], eps[i], true) // true/false
 			} else {
-				matrix[i][j] = solve(eps[i], eps[j], false)
+				matrix[i][j] = solve(eps[j], eps[i], false)
 			}
 		}
 	}
@@ -81,7 +81,6 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 		for i := range iN {
 			args[i] = round(step*float64(i), 6)
 			values[i] = opts.LineData{Value: math.Abs(uGrid[Nh/2][int(math.Round(float64(i)*step/tau))] - uAns(0.5, float64(i)*step))}
-
 		}
 		chart := charts.NewLine()
 		chart.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: "Decision error"}))
@@ -91,6 +90,7 @@ func solve(h, tau float64, needPrint bool) (maxDeviation float64) {
 		chart.Render(file)
 		fmt.Printf("Task 3: Successful! Look at the file <task3.html>\n\n")
 	}
+
 	return
 }
 
