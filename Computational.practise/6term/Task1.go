@@ -1,3 +1,6 @@
+// v1.1
+// 14/02/2025
+
 package main
 
 import (
@@ -39,7 +42,7 @@ func printTable(m *[][]string) {
 }
 
 func main() {
-	lm := 1.0
+	lam := 1.0
 	dStep := [3]int{6, 7, 8}
 	N := [6]int{10, 12, 20, 24, 40, 48}
 	A := make([][]string, 4)
@@ -53,14 +56,14 @@ func main() {
 	for i := 0; i < 3; i++ {
 		A[i+1][0] = fmt.Sprintf("%d", dStep[i])
 		for j := 0; j < 6; j++ {
-			m, lmM := solve(dStep[i], N[j])
-			A[i+1][j+1] = fmt.Sprintf("%d|%.0e", m, lm-lmM)
+			nMax, lMax, nMin, lMin := solve(dStep[i], N[j])
+			A[i+1][j+1] = fmt.Sprintf("%d|%.0e| |%d|%.0e", nMax, lam-lMax, nMin, lMin)
 		}
 	}
 	printTable(&A)
 }
 
-func solve(dStep, N int) (int, float64) {
+func solve(dStep, N int) (int, float64, int, float64) {
 	var a, b float64 = 1.1, 0.8
 	// f := func(x, y float64) float64 { return 1.1*Sin(x) + (3.2*x*x+4.4*y*y)*Cos(2*x*y) }
 	phi := func(x, y float64) float64 { return Sin(x) + Cos(2*x*y) }
@@ -141,12 +144,12 @@ func solve(dStep, N int) (int, float64) {
 	A := func(i, j int) float64 {
 		return -float64(N*N) * (a*(U_old[i-1][j]-2*U_old[i][j]+U_old[i+1][j]) + b*(U_old[i][j-1]-2*U_old[i][j]+U_old[i][j+1]))
 	}
-	delta, m := Pow10(-dStep), 0
-	var lm1, lm float64 = 1, 0
+	delta, nA := Pow10(-dStep), 0
+	var lA1, lA float64 = 1, 0
 	deltaCalc := func(lm, lm1 float64) float64 {
 		return Abs(lm1-lm) / Abs(lm)
 	}
-	for m = 0; deltaCalc(lm, lm1) > delta && m < 10000; m++ {
+	for nA = 0; deltaCalc(lA, lA1) > delta && nA < 1000; nA++ {
 		for _, v := range D {
 			U_old[v[0]][v[1]] = U[v[0]][v[1]]
 		}
@@ -154,13 +157,49 @@ func solve(dStep, N int) (int, float64) {
 			U[v[0]][v[1]] = A(v[0], v[1])
 		}
 		norm(&U)
-		lm = lm1
-		lm1 = scalar(&U, &U_old) / scalar(&U_old, &U_old)
+		lA = lA1
+		lA1 = scalar(&U, &U_old) / scalar(&U_old, &U_old)
 	}
-
 	if N == 10 && dStep == 6 {
 		printM(&U)
 		fmt.Println()
 	}
-	return m, lm1
+
+	// Приступим к вычислению минимального с.з.
+	V := make([][]float64, N+1)
+	for i := 0; i <= N; i++ {
+		V[i] = make([]float64, N+1)
+	}
+	// Вносим начальные данные
+	for _, v := range dD {
+		V[v[0]][v[1]] = phi(h*float64(v[0]), h*float64(v[1]))
+	}
+	// Заполняем начальное приближение
+	for _, v := range IntD {
+		V[v[0]][v[1]] = 1
+	}
+	norm(&V)
+	V_old := make([][]float64, N+1)
+	for i := 0; i <= N; i++ {
+		V_old[i] = make([]float64, N+1)
+	}
+	B := func(i, j int) float64 {
+		return (lA1 - A(i, j)) * V_old[i][j]
+	}
+
+	nB := 0
+	var lB1, lB float64 = 1, 0
+	for nB = 0; deltaCalc(lB, lB1) > delta && nB < 1000; nB++ {
+		for _, v := range D {
+			V_old[v[0]][v[1]] = V[v[0]][v[1]]
+		}
+		for _, v := range IntD {
+			V[v[0]][v[1]] = B(v[0], v[1])
+		}
+		norm(&V)
+		lB = lB1
+		lB1 = scalar(&V, &V_old) / scalar(&V_old, &V_old)
+	}
+
+	return nA, lA1, nB, lA1 - lB1
 }
