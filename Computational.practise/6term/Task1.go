@@ -42,22 +42,21 @@ func printTable(m *[][]string) {
 }
 
 func main() {
-	lam := 1.0
-	dStep := [3]int{6, 7, 8}
-	N := [6]int{10, 12, 20, 24, 40, 48}
+	dStep := [...]int{6, 7, 8}
+	N := [...]int{10, 20, 40}
 	A := make([][]string, 4)
 	for i := range A {
 		A[i] = make([]string, 7)
 	}
 	A[0][0] = "d\\N"
-	for j := 0; j < 6; j++ {
+	for j := 0; j < len(N); j++ {
 		A[0][j+1] = fmt.Sprintf("%d", N[j])
 	}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < len(dStep); i++ {
 		A[i+1][0] = fmt.Sprintf("%d", dStep[i])
-		for j := 0; j < 6; j++ {
+		for j := 0; j < len(N); j++ {
 			nMax, lMax, nMin, lMin := solve(dStep[i], N[j])
-			A[i+1][j+1] = fmt.Sprintf("%d|%.0e| |%d|%.0e", nMax, lam-lMax, nMin, lMin)
+			A[i+1][j+1] = fmt.Sprintf("%d|%f| |%d|%f", nMax, lMax, nMin, lMin)
 		}
 	}
 	printTable(&A)
@@ -66,7 +65,7 @@ func main() {
 func solve(dStep, N int) (int, float64, int, float64) {
 	var a, b float64 = 1.1, 0.8
 	// f := func(x, y float64) float64 { return 1.1*Sin(x) + (3.2*x*x+4.4*y*y)*Cos(2*x*y) }
-	phi := func(x, y float64) float64 { return Sin(x) + Cos(2*x*y) }
+	phi := func(x, y float64) float64 { return 0 } //Sin(x) + Cos(2*x*y) }
 	h := 1 / float64(N)
 
 	// Создаём области для удобства циклов
@@ -108,6 +107,33 @@ func solve(dStep, N int) (int, float64, int, float64) {
 			}
 		}
 	}
+	/*
+		var dD [][2]int
+		for j := 0; j <= N; j++ {
+			dD = append(dD, [2]int{0, j})
+		}
+		for i := 1; i <= N; i++ {
+			dD = append(dD, [2]int{i, 0})
+		}
+		for i := 1; i <= N; i++ {
+			dD = append(dD, [2]int{i, N})
+		}
+		for j := 1; j < N; j++ {
+			dD = append(dD, [2]int{N, j})
+		}
+		var IntD [][2]int
+		for i := 1; i < N; i++ {
+			for j := 1; j < N; j++ {
+				IntD = append(IntD, [2]int{i, j})
+			}
+		}
+		var D [][2]int
+		for i := 0; i <= N; i++ {
+			for j := 0; j <= N; j++ {
+				D = append(D, [2]int{i, j})
+			}
+		}
+	*/
 
 	U := make([][]float64, N+1)
 	for i := 0; i <= N; i++ {
@@ -156,9 +182,9 @@ func solve(dStep, N int) (int, float64, int, float64) {
 		for _, v := range IntD {
 			U[v[0]][v[1]] = A(v[0], v[1])
 		}
-		norm(&U)
 		lA = lA1
 		lA1 = scalar(&U, &U_old) / scalar(&U_old, &U_old)
+		norm(&U)
 	}
 	if N == 10 && dStep == 6 {
 		printM(&U)
@@ -184,7 +210,7 @@ func solve(dStep, N int) (int, float64, int, float64) {
 		V_old[i] = make([]float64, N+1)
 	}
 	B := func(i, j int) float64 {
-		return (lA1 - A(i, j)) * V_old[i][j]
+		return lA1*V_old[i][j] + float64(N*N)*(a*(V_old[i-1][j]-2*V_old[i][j]+V_old[i+1][j])+b*(V_old[i][j-1]-2*V_old[i][j]+V_old[i][j+1]))
 	}
 
 	nB := 0
@@ -196,9 +222,9 @@ func solve(dStep, N int) (int, float64, int, float64) {
 		for _, v := range IntD {
 			V[v[0]][v[1]] = B(v[0], v[1])
 		}
-		norm(&V)
 		lB = lB1
 		lB1 = scalar(&V, &V_old) / scalar(&V_old, &V_old)
+		norm(&V)
 	}
 
 	return nA, lA1, nB, lA1 - lB1
