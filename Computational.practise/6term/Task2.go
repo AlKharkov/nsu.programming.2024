@@ -1,5 +1,5 @@
-// v2.0
-// 23/02/2025
+// v2.2
+// 24/02/2025
 
 package main
 
@@ -56,7 +56,7 @@ func main() {
 		A[i+1][0] = fmt.Sprintf("%d", dStep[i])
 		for j := range len(N) {
 			n, eps := solve(dStep[i], N[j])
-			A[i+1][j+1] = fmt.Sprintf("%d|%f", n, eps)
+			A[i+1][j+1] = fmt.Sprintf("%d|%.0e", n, eps)
 		}
 	}
 	printTable(&A)
@@ -142,9 +142,10 @@ func solve(dStep, N int) (int, float64) {
 		for _, v := range IntD {
 			result += (*A)[v[0]][v[1]] * (*B)[v[0]][v[1]]
 		}
+		result *= Pow(h, 2)
 		return
 	}
-	scalarNorm := func(m *[][]float64) float64 { return scalar(m, m) }
+	scalarNorm := func(m *[][]float64) float64 { return Sqrt(scalar(m, m)) }
 	// norm := func(m *[][]float64, n float64) {
 	// 	if n == -1 {
 	// 		n = Sqrt(scalar(m, m))
@@ -184,61 +185,58 @@ func solve(dStep, N int) (int, float64) {
 	KsiOld := make([][]float64, N+1)
 	init(&KsiOld)
 
+	XOld := make([][]float64, N+1)
+	init(&XOld)
+	// Вносим начальные данные
+	for _, v := range dD {
+		XOld[v[0]][v[1]] = phi(h*float64(v[0]), h*float64(v[1]))
+	}
+
+	Ksi := make([][]float64, N+1)
+	init(&Ksi)
+
+	calcKsi := func(K, B *[][]float64) {
+		for _, v := range IntD {
+			(*K)[v[0]][v[1]] = A(v[0], v[1], B) - F[v[0]][v[1]]
+		}
+	}
+
 	tauCalc := func() float64 {
 		AKsi := make([][]float64, N+1)
 		init(&AKsi)
 		for _, v := range IntD {
 			AKsi[v[0]][v[1]] = A(v[0], v[1], &KsiOld)
 		}
-		normAKsi := Sqrt(scalarNorm(&AKsi))
-		for _, v := range IntD {
-			AKsi[v[0]][v[1]] /= normAKsi
-		}
-		KsiCopy := make([][]float64, N+1)
-		init(&KsiCopy)
-		for _, v := range IntD {
-			KsiCopy[v[0]][v[1]] = KsiOld[v[0]][v[1]] / normAKsi
-		}
-		return scalar(&AKsi, &KsiCopy)
-	}
-
-	XOld := make([][]float64, N+1)
-	init(&XOld)
-
-	Ksi := make([][]float64, N+1)
-	init(&Ksi)
-
-	calcKsi := func(K, X *[][]float64) {
-		for _, v := range IntD {
-			(*K)[v[0]][v[1]] = A(v[0], v[1], X) - F[v[0]][v[1]]
-		}
+		return scalar(&AKsi, &KsiOld) / scalar(&AKsi, &AKsi) // Мин. неявки
+		// return scalar(&KsiOld, &KsiOld) / scalar(&AKsi, &KsiOld) // Скорейшего спуска
 	}
 
 	deltaCalc := func() float64 {
-		normKsi := Sqrt(scalarNorm(&KsiOld))
 		deltaKsi := make([][]float64, N+1)
 		init(&deltaKsi)
 		for _, v := range IntD {
-			deltaKsi[v[0]][v[1]] = (Ksi[v[0]][v[1]] - KsiOld[v[0]][v[1]]) / normKsi
+			deltaKsi[v[0]][v[1]] = Ksi[v[0]][v[1]] - KsiOld[v[0]][v[1]]
 		}
-		return scalarNorm(&deltaKsi)
+		return scalarNorm(&deltaKsi) / scalarNorm(&KsiOld)
 	}
 
 	n := 0
-	for delta := Pow10(-dStep); n > 0 && deltaCalc() > delta && n < 1000; n++ {
+	for delta := Pow10(-dStep); n == 0 || (deltaCalc() > delta && n < 10000); n++ {
+		// Старое стало текущим, т.е n+1 -> n
 		for _, v := range IntD {
 			XOld[v[0]][v[1]] = X[v[0]][v[1]]
 		}
 		calcKsi(&KsiOld, &XOld)
+		// Вычисляем шаг алгоритма
 		tau := tauCalc()
 		for _, v := range IntD {
 			X[v[0]][v[1]] = XOld[v[0]][v[1]] - tau*KsiOld[v[0]][v[1]]
 		}
 		calcKsi(&Ksi, &X)
-	}
-	if N == 10 && dStep == 6 {
-		printM(&X)
-		fmt.Println()
+
+		if N == 10 && n > 320 {
+			fmt.Println(N, dStep, n, deltaCalc(), tau)
+		}
 	}
 
 	Eps := make([][]float64, N+1)
@@ -246,6 +244,5 @@ func solve(dStep, N int) (int, float64) {
 	for _, v := range IntD {
 		Eps[v[0]][v[1]] = phi(h*float64(v[0]), h*float64(v[1])) - X[v[0]][v[1]]
 	}
-
-	return n, scalarNorm(&Eps)
+	return n, scalarNorm(&Eps) // deltaCalc()
 }
