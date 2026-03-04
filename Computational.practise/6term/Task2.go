@@ -1,5 +1,5 @@
-// v2.2
-// 24/02/2025
+// v2.3 (final)
+// 03/03/2025
 
 package main
 
@@ -9,19 +9,19 @@ import (
 	"strings"
 )
 
-func printM(m *[][]float64) {
-	for _, a := range *m {
-		for _, v := range a {
-			if Abs(v) < Pow10(-6) {
-				fmt.Print("    \t")
-			} else {
-				fmt.Printf("%.2f\t", v)
-			}
-		}
-		fmt.Println()
-	}
-	fmt.Println()
-}
+// func printM(m *[][]float64) {
+// 	for _, a := range *m {
+// 		for _, v := range a {
+// 			if Abs(v) < Pow10(-6) {
+// 				fmt.Print("    \t")
+// 			} else {
+// 				fmt.Printf("%.2f\t", v)
+// 			}
+// 		}
+// 		fmt.Println()
+// 	}
+// 	fmt.Println()
+// }
 
 func printTable(m *[][]string) {
 	l := make([]int, len((*m)[0]))
@@ -56,7 +56,7 @@ func main() {
 		A[i+1][0] = fmt.Sprintf("%d", dStep[i])
 		for j := range len(N) {
 			n, eps := solve(dStep[i], N[j])
-			A[i+1][j+1] = fmt.Sprintf("%d|%.0e", n, eps)
+			A[i+1][j+1] = fmt.Sprintf("%d|%f", n, eps)
 		}
 	}
 	printTable(&A)
@@ -64,8 +64,8 @@ func main() {
 
 func solve(dStep, N int) (int, float64) {
 	var a, b float64 = 1.1, 0.8
-	f := func(x, y float64) float64 { return 1.1*Sin(x) + (3.2*x*x+4.4*y*y)*Cos(2*x*y) }
-	phi := func(x, y float64) float64 { return Sin(x) + Cos(2*x*y) }
+	f := func(y, x float64) float64 { return 1.1*Sin(x) + (3.2*x*x+4.4*y*y)*Cos(2*x*y) }
+	phi := func(y, x float64) float64 { return Sin(x) + Cos(2*x*y) }
 	h := 1 / float64(N)
 
 	// Создаём области для удобства циклов
@@ -136,7 +136,6 @@ func solve(dStep, N int) (int, float64) {
 			}
 		}
 	*/
-
 	// Рассматриваем IntD в качестве вектора
 	scalar := func(A, B *[][]float64) (result float64) {
 		for _, v := range IntD {
@@ -145,6 +144,7 @@ func solve(dStep, N int) (int, float64) {
 		result *= Pow(h, 2)
 		return
 	}
+
 	scalarNorm := func(m *[][]float64) float64 { return Sqrt(scalar(m, m)) }
 	// norm := func(m *[][]float64, n float64) {
 	// 	if n == -1 {
@@ -173,7 +173,7 @@ func solve(dStep, N int) (int, float64) {
 	}
 
 	A := func(i, j int, B *[][]float64) float64 {
-		return -float64(N*N) * (a*((*B)[i-1][j]-2*(*B)[i][j]+(*B)[i+1][j]) + b*((*B)[i][j-1]-2*(*B)[i][j]+(*B)[i][j+1]))
+		return -float64(N*N) * (a*((*B)[i][j-1]-2*(*B)[i][j]+(*B)[i][j+1]) + b*((*B)[i-1][j]-2*(*B)[i][j]+(*B)[i+1][j]))
 	}
 
 	F := make([][]float64, N+1)
@@ -211,6 +211,15 @@ func solve(dStep, N int) (int, float64) {
 		// return scalar(&KsiOld, &KsiOld) / scalar(&AKsi, &KsiOld) // Скорейшего спуска
 	}
 
+	epsCalc := func() float64 {
+		Eps := make([][]float64, N+1)
+		init(&Eps)
+		for _, v := range IntD {
+			Eps[v[0]][v[1]] = X[v[0]][v[1]] - phi(h*float64(v[0]), h*float64(v[1]))
+		}
+		return scalarNorm(&Eps)
+	}
+
 	deltaCalc := func() float64 {
 		deltaKsi := make([][]float64, N+1)
 		init(&deltaKsi)
@@ -222,7 +231,7 @@ func solve(dStep, N int) (int, float64) {
 
 	n := 0
 	for delta := Pow10(-dStep); n == 0 || (deltaCalc() > delta && n < 10000); n++ {
-		// Старое стало текущим, т.е n+1 -> n
+		// Текущее стало старым, т.е n+1 -> n
 		for _, v := range IntD {
 			XOld[v[0]][v[1]] = X[v[0]][v[1]]
 		}
@@ -234,15 +243,9 @@ func solve(dStep, N int) (int, float64) {
 		}
 		calcKsi(&Ksi, &X)
 
-		if N == 10 && n > 320 {
-			fmt.Println(N, dStep, n, deltaCalc(), tau)
-		}
+		//if N == 20 && dStep == 6 && n > 1470 {
+		//	fmt.Println(N, dStep, n, deltaCalc(), tau, epsCalc())
+		//}
 	}
-
-	Eps := make([][]float64, N+1)
-	init(&Eps)
-	for _, v := range IntD {
-		Eps[v[0]][v[1]] = phi(h*float64(v[0]), h*float64(v[1])) - X[v[0]][v[1]]
-	}
-	return n, scalarNorm(&Eps) // deltaCalc()
+	return n, epsCalc()
 }
