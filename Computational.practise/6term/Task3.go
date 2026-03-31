@@ -1,5 +1,5 @@
-// v1.0
-// 12/03/2025
+// v1.2 (final)
+// 31/03/2026
 
 package main
 
@@ -56,7 +56,7 @@ func main() {
 		A[i+1][0] = fmt.Sprintf("%d", dStep[i])
 		for j := range len(N) {
 			n, eps := solve(dStep[i], N[j])
-			A[i+1][j+1] = fmt.Sprintf("%d|%f", n, eps)
+			A[i+1][j+1] = fmt.Sprintf("%d|%e", n, eps)
 		}
 	}
 	fmt.Println("Формат вывода: <число итераций> | <Сеточная норма матрицы (U - P)>, где P - точное решение")
@@ -65,160 +65,147 @@ func main() {
 
 func solve(dStep, N int) (int, float64) {
 	var a, b float64 = 1.1, 0.8
-	f := func(y, x float64) float64 { return 1.1*Sin(x) + (3.2*x*x+4.4*y*y)*Cos(2*x*y) }
-	phi := func(y, x float64) float64 { return Sin(x) + Cos(2*x*y) }
-	h := 1 / float64(N)
 
-	// Создаём области для удобства циклов
-	// Случай М из варианта
-	var dD [][2]int
-	for j := 0; j <= N; j++ {
-		dD = append(dD, [2]int{0, j})
+	f := func(y, x float64) float64 {
+		return 1.1*Sin(x) + (3.2*x*x+4.4*y*y)*Cos(2*x*y)
 	}
-	for i := 1; i <= N; i++ {
-		dD = append(dD, [2]int{i, 0})
+
+	phi := func(y, x float64) float64 {
+		return Sin(x) + Cos(2*x*y)
 	}
-	for i := 1; i <= N; i++ {
-		dD = append(dD, [2]int{i, N})
-	}
-	for k := (N + 1) / 2; k < N; k++ {
-		dD = append(dD, [2]int{k, k})
-	}
-	for k := (N+1)/2 + 1; k < N; k++ {
-		dD = append(dD, [2]int{k, N - k})
-	}
+
+	h := 1.0 / float64(N)
+
+	// Определение внутренних точек
 	var IntD [][2]int
-	for i := 1; i < N/2; i++ {
+	for i := 1; i < N; i++ {
 		for j := 1; j < N; j++ {
-			IntD = append(IntD, [2]int{i, j})
-		}
-	}
-	for i := N / 2; i < N; i++ {
-		for j := 1; j < N-i; j++ {
-			IntD = append(IntD, [2]int{i, j})
-		}
-		for j := i + 1; j < N; j++ {
-			IntD = append(IntD, [2]int{i, j})
-		}
-	}
-	var D [][2]int
-	for i := 0; i <= N; i++ {
-		for j := 0; j <= N; j++ {
-			if j >= i || i+j <= N {
-				D = append(D, [2]int{i, j})
-			}
-		}
-	}
-	/*
-		// Случай квадрата
-		var dD [][2]int
-		for j := 0; j <= N; j++ {
-			dD = append(dD, [2]int{0, j})
-		}
-		for i := 1; i <= N; i++ {
-			dD = append(dD, [2]int{i, 0})
-		}
-		for i := 1; i <= N; i++ {
-			dD = append(dD, [2]int{i, N})
-		}
-		for j := 1; j < N; j++ {
-			dD = append(dD, [2]int{N, j})
-		}
-		var IntD [][2]int
-		for i := 1; i < N; i++ {
-			for j := 1; j < N; j++ {
+			if i < j || i+j < N {
 				IntD = append(IntD, [2]int{i, j})
 			}
 		}
-		var D [][2]int
-		for i := 0; i <= N; i++ {
-			for j := 0; j <= N; j++ {
-				D = append(D, [2]int{i, j})
+	}
+
+	// Оперделение индексов границы области D
+	var dD [][2]int
+	for i := 0; i <= N; i++ {
+		for j := 0; j <= N; j++ {
+			if (i == j && i >= N/2) || (i+j == N && i > N/2) || i == 0 || (j == 0 && i != 0 && i != N) || (j == N && i != 0 && i != N) {
+				dD = append(dD, [2]int{i, j})
 			}
 		}
-	*/
-	// Рассматриваем IntD в качестве вектора
-	scalar := func(A, B *[][]float64) (result float64) {
+	}
+
+	// Создаем матрицы для решений на итерациях U_n+1, U_n, и правой части
+	U := make([][]float64, N+1)
+	Uold := make([][]float64, N+1)
+	F := make([][]float64, N+1)
+
+	// Выделяем память
+	for i := range N + 1 {
+		U[i] = make([]float64, N+1)
+		Uold[i] = make([]float64, N+1)
+		F[i] = make([]float64, N+1)
+	}
+
+	// Заполняем точки границы точным решением
+	for _, v := range dD {
+		i, j := v[0], v[1]
+		y, x := h*float64(i), h*float64(j)
+		U[i][j] = phi(y, x)
+		Uold[i][j] = phi(y, x)
+	}
+
+	// Заполняем правую часть для внутренних точек
+	for _, v := range IntD {
+		x := h * float64(v[1])
+		y := h * float64(v[0])
+		F[v[0]][v[1]] = f(y, x)
+	}
+
+	// Начальное приближение только для внутренних точек
+	for _, v := range IntD {
+		U[v[0]][v[1]] = 1.0
+		Uold[v[0]][v[1]] = 1.0
+	}
+
+	// Скалярное произведение в сеточной норме
+	scalar := func(A, B *[][]float64) float64 {
+		result := 0.0
 		for _, v := range IntD {
 			result += (*A)[v[0]][v[1]] * (*B)[v[0]][v[1]]
 		}
-		result *= Pow(h, 2)
-		return
+		return result * h * h
 	}
 
-	scalarNorm := func(m *[][]float64) float64 { return Sqrt(scalar(m, m)) }
-	// norm := func(m *[][]float64, n float64) {
-	// 	if n == -1 {
-	// 		n = Sqrt(scalar(m, m))
-	// 	}
-	// 	for _, v := range IntD {
-	// 		(*m)[v[0]][v[1]] /= n
-	// 	}
-	// }
-
-	init := func(m *[][]float64) {
-		for i := range N + 1 {
-			(*m)[i] = make([]float64, N+1)
-		}
+	// Норма матрицы в сеточной норме
+	scalarNorm := func(m *[][]float64) float64 {
+		return Sqrt(scalar(m, m))
 	}
 
-	U := make([][]float64, N+1)
-	init(&U)
-	// Заполняем начальное приближение
-	for _, v := range IntD {
-		U[v[0]][v[1]] = 1.0
-	}
-	// Вносим начальные данные
-	for _, v := range dD {
-		U[v[0]][v[1]] = phi(h*float64(v[0]), h*float64(v[1]))
-	}
-
-	F := make([][]float64, N+1)
-	init(&F)
-	for _, v := range IntD {
-		F[v[0]][v[1]] = f(h*float64(v[0]), h*float64(v[1]))
-	}
-
-	Uold := make([][]float64, N+1)
-	init(&Uold)
-	// Вносим начальные данные
-	for _, v := range dD {
-		Uold[v[0]][v[1]] = phi(h*float64(v[0]), h*float64(v[1]))
-	}
-
+	// Вычисляем ||U_n+1 - U_n||
 	deltaCalc := func() float64 {
 		deltaU := make([][]float64, N+1)
-		init(&deltaU)
+		for i := range N + 1 {
+			deltaU[i] = make([]float64, N+1)
+		}
 		for _, v := range IntD {
 			deltaU[v[0]][v[1]] = U[v[0]][v[1]] - Uold[v[0]][v[1]]
 		}
 		return scalarNorm(&deltaU)
 	}
 
+	// Оптимальный параметр
 	spR := Cos(Pi / float64(N+1))
-	omega := 2 / (1 + Sqrt(spR*(2-spR)))
+	omega := 2.0 / (1.0 + Sqrt(1.0-spR*spR))
+
 	n := 0
-	for eps := Pow10(-dStep); n == 0 || (deltaCalc() > eps && n < 10000); n++ {
-		// Текущее стало старым, т.е n+1 -> n
+	eps := Pow10(-dStep)
+	cnt := 0
+
+	// Основной цикл
+	for n = 0; cnt < 3 && n < 1000; n++ {
+		// Для выхода нужно набрать 3 подходящих итерации подряд
+		if deltaCalc() < eps {
+			cnt += 1
+		} else {
+			cnt = 0
+		}
+
+		// Сохраняем текущее решение
 		for _, v := range IntD {
 			Uold[v[0]][v[1]] = U[v[0]][v[1]]
 		}
-		// Шаг алгоритма
-		for _, v := range IntD {
-			x, y := v[1], v[0]
-			uWave := (a*(U[y][x-1]+Uold[y][x+1]) + b*(U[y-1][x]+Uold[y+1][x]) - h*h*F[y][x]) / 2 / (a + b) // Зейдель
-			U[y][x] = (1-omega)*Uold[y][x] + omega*uWave                                                   // Верхняя релаксация
-		}
 
+		// Итерация - обход в естественном порядке
+		for _, v := range IntD {
+			i, j := v[0], v[1]
+
+			// Разностная схема: a*(u_{i,j-1} - 2u_{i,j} + u_{i,j+1})/h^2 +
+			//                   b*(u_{i-1,j} - 2u_{i,j} + u_{i+1,j})/h^2 = -f_{i,j}
+			//
+			// Выражаем u_{i,j}: u_{i,j} = (a*(u_{i,j-1}+u_{i,j+1}) + b*(u_{i-1,j}+u_{i+1,j}) + h^2*f_{i,j}) / (2*(a+b))
+
+			uWave := (a*(U[i][j-1]+Uold[i][j+1]) + b*(U[i-1][j]+Uold[i+1][j]) + h*h*F[i][j]) / (2.0 * (a + b))
+			U[i][j] = (1.0-omega)*Uold[i][j] + omega*uWave
+		}
 	}
 
-	dUCalc := func() float64 {
-		dU := make([][]float64, N+1)
-		init(&dU)
-		for _, v := range IntD {
-			dU[v[0]][v[1]] = U[v[0]][v[1]] - phi(h*float64(v[0]), h*float64(v[1]))
-		}
-		return scalarNorm(&dU)
+	// Вычисляем ошибку на внутренних точках, т.е ||U - Phi||
+	err := 0.0
+	for _, v := range IntD {
+		x := h * float64(v[1])
+		y := h * float64(v[0])
+		diff := U[v[0]][v[1]] - phi(y, x)
+		err += diff * diff
 	}
-	return n, dUCalc()
+	err = Sqrt(err * h * h)
+
+	return n, err
 }
+
+// Формат вывода: <число итераций> | <Сеточная норма матрицы (U - P)>, где P - точное решение
+// d\N    10                 20                 40
+// 6      28|4.335256e-05    51|1.112073e-05    97|2.792101e-06
+// 7      33|4.334247e-05    59|1.116293e-05    112|2.811497e-06
+// 8      36|4.334415e-05    67|1.114860e-05    126|2.813621e-06
